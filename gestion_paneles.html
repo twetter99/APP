@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Paneles TFT – CRTM</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --bg: #0F172A;
+            --bg-soft: #F4F6F8;
+            --card: #FFFFFF;
+            --text: #0B1220;
+            --muted: #64748B;
+            --primary: #1E3A8A;
+            --accent: #334155;
+            --ok: #1B9E77;
+            --warn: #B45309;
+            --border: #E5E7EB;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, sans-serif;
+            background: var(--bg-soft);
+            color: var(--text);
+            line-height: 1.5;
+            font-size: 15px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .header {
+            background: var(--bg);
+            color: white;
+            padding: 40px 32px;
+            text-align: center;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.85;
+            font-weight: 400;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 20px;
+        }
+
+        .control-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: inherit;
+            background: var(--card);
+            color: var(--text);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+        }
+
+        button {
+            width: 100%;
+            height: 46px;
+            padding: 0 20px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        button:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #1e40af;
+        }
+
+        .btn-secondary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #475569;
+        }
+
+        .btn-success {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #1e40af;
+        }
+
+        .btn-danger {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #475569;
+        }
+
+        .btn-warning {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-warning:hover:not(:disabled) {
+            background: #475569;
+        }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1.2;
+        }
+
+        .table-container {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            overflow-x: auto;
+        }
+
+        .search-box {
+            margin-bottom: 20px;
+        }
+
+        .search-box input {
+            width: 100%;
+            max-width: 400px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card);
+        }
+
+        th {
+            background: var(--bg);
+            color: white;
+            padding: 14px 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+            font-size: 14px;
+        }
+
+        tr:hover {
+            background: var(--bg-soft);
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 6px 14px;
+            font-size: 13px;
+            width: auto;
+            height: auto;
+            font-weight: 500;
+        }
+
+        .partial-badge {
+            background: var(--warn);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.75);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--card);
+            padding: 32px;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .modal-header h2 {
+            color: var(--text);
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .close-modal {
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            color: var(--muted);
+            line-height: 1;
+        }
+
+        .close-modal:hover {
+            color: var(--text);
+        }
+
+        @media (max-width: 1024px) {
+            .actions-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 16px;
+            }
+            .header {
+                padding: 32px 20px;
+            }
+            .header h1 {
+                font-size: 28px;
+            }
+            .control-row {
+                grid-template-columns: 1fr;
+            }
+            .actions-grid {
+                grid-template-columns: 1fr;
+            }
+            .stats {
+                grid-template-columns: 1fr;
+            }
+            .card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Gestión de Paneles TFT – CRTM</h1>
+            <p>Control mensual de instalación, mantenimiento y facturación</p>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">Parámetros</h2>
+            <div class="control-row">
+                <div class="control-group">
+                    <label>Mes Actual</label>
+                    <select id="currentMonth">
+                        <option value="01">Enero</option>
+                        <option value="02">Febrero</option>
+                        <option value="03">Marzo</option>
+                        <option value="04">Abril</option>
+                        <option value="05">Mayo</option>
+                        <option value="06">Junio</option>
+                        <option value="07">Julio</option>
+                        <option value="08">Agosto</option>
+                        <option value="09">Septiembre</option>
+                        <option value="10" selected>Octubre</option>
+                        <option value="11">Noviembre</option>
+                        <option value="12">Diciembre</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Año</label>
+                    <input type="number" id="currentYear" value="2025" min="2020" max="2030">
+                </div>
+                <div class="control-group">
+                    <label>Tarifa Base 30 Días</label>
+                    <input type="number" id="baseRate" value="37.70" step="0.01">
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">Acciones</h2>
+            <div class="actions-grid">
+                <button onclick="addPanel()" class="btn-primary">➕ Añadir Panel Nuevo</button>
+                <button onclick="removePanel()" class="btn-secondary">➖ Eliminar Panel</button>
+                <button onclick="dismountPanel()" class="btn-secondary">📦 Desmontar Panel</button>
+                <button onclick="processMonthlyChanges()" class="btn-primary">📋 Procesar Cambios Mensuales</button>
+                <button onclick="exportData()" class="btn-primary">💾 Exportar Excel</button>
+                <button onclick="importData()" class="btn-secondary">📂 Importar Datos</button>
+                <button onclick="viewHistory()" class="btn-secondary">📊 Ver Histórico Mensual</button>
+                <button onclick="exportHistory()" class="btn-secondary">💾 Exportar Histórico Completo</button>
+                <button onclick="loadMonthFromHistory()" class="btn-secondary">📥 Cargar Mes del Histórico</button>
+                <button onclick="backupComplete()" class="btn-secondary">💾 Backup Completo (JSON)</button>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <h3>Total Paneles</h3>
+                <div class="value" id="totalPanels">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Facturación Mensual</h3>
+                <div class="value" id="totalRevenue">0,00 €</div>
+            </div>
+            <div class="stat-card">
+                <h3>Municipios</h3>
+                <div class="value" id="totalMunicipios">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Paneles Parciales</h3>
+                <div class="value" id="partialPanels">0</div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="🔍 Buscar por municipio o código..." onkeyup="filterTable()">
+            </div>
+            <table id="panelsTable">
+                <thead>
+                    <tr>
+                        <th>Municipio</th>
+                        <th>Código Parada</th>
+                        <th>Días Facturables</th>
+                        <th>Facturación (€)</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modal para añadir panel -->
+    <div id="addPanelModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close-modal" onclick="closeModal('addPanelModal')">&times;</span>
+                <h2>➕ Añadir Nuevo Panel</h2>
+            </div>
+            <div class="control-group">
+                <label>Municipio</label>
+                <input type="text" id="newMunicipio" placeholder="Ej: Madrid">
+            </div>
+            <div class="control-group">
+                <label>Código Parada</label>
+                <input type="text" id="newCodigo" placeholder="Ej: 12345">
+            </div>
+            <div class="control-group">
+                <label>Fecha Instalación</label>
+                <input type="date" id="newFechaInstalacion">
+            </div>
+            <div class="control-group" style="margin-top: 20px;">
+                <button onclick="saveNewPanel()" class="btn-success">Guardar Panel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para eliminar panel -->
+    <div id="removePanelModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close-modal" onclick="closeModal('removePanelModal')">&times;</span>
+                <h2>➖ Eliminar Panel</h2>
+            </div>
+            <div class="control-group">
+                <label>Código Parada</label>
+                <input type="text" id="removeCodigo" placeholder="Ej: 12345">
+            </div>
+            <div class="control-group" style="margin-top: 20px;">
+                <button onclick="confirmRemovePanel()" class="btn-danger">Eliminar Panel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para desmontar panel -->
+    <div id="dismountPanelModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close-modal" onclick="closeModal('dismountPanelModal')">&times;</span>
+                <h2>📦 Desmontar Panel</h2>
+            </div>
+            <div class="control-group">
+                <label>Código Parada</label>
+                <input type="text" id="dismountCodigo" placeholder="Ej: 12345">
+            </div>
+            <div class="control-group">
+                <label>Fecha Desmontaje</label>
+                <input type="date" id="dismountFecha">
+            </div>
+            <div class="control-group" style="margin-top: 20px;">
+                <button onclick="confirmDismountPanel()" class="btn-warning">Desmontar Panel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para ver histórico -->
+    <div id="historyModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <span class="close-modal" onclick="closeModal('historyModal')">&times;</span>
+                <h2>📊 Histórico Mensual</h2>
+            </div>
+            <div id="historyContent" style="max-height: 500px; overflow-y: auto;">
+                <p>Cargando histórico...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Base de datos en memoria (localStorage)
+        let panelsData = [];
+        const STORAGE_KEY = 'paneles_solares_data';
+        const HISTORY_KEY = 'paneles_solares_history';
+        let monthlyHistory = {};
+
+        // Cargar datos iniciales desde octubre 2025
+        function loadInitialData() {
+            const savedData = localStorage.getItem(STORAGE_KEY);
+            if (savedData) {
+                panelsData = JSON.parse(savedData);
+            } else {
+                panelsData = [];
+            }
+            
+            // Cargar históricos
+            const savedHistory = localStorage.getItem(HISTORY_KEY);
+            if (savedHistory) {
+                monthlyHistory = JSON.parse(savedHistory);
+            } else {
+                monthlyHistory = {};
+            }
+            
+            updateTable();
+        }
+
+        // Guardar datos en localStorage
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(panelsData));
+            
+            // Guardar histórico del mes actual
+            const month = document.getElementById('currentMonth').value;
+            const year = document.getElementById('currentYear').value;
+            const monthKey = `${year}-${month}`;
+            
+            // Calcular snapshot del mes
+            const snapshot = {
+                fecha: new Date().toISOString(),
+                mes: month,
+                año: year,
+                totalPaneles: panelsData.length,
+                paneles: JSON.parse(JSON.stringify(panelsData)), // Deep copy
+                facturacionTotal: 0
+            };
+            
+            // Calcular facturación
+            panelsData.forEach(panel => {
+                const days = calculateDays(panel, parseInt(month), parseInt(year));
+                const billing = parseFloat(calculateBilling(days));
+                snapshot.facturacionTotal += billing;
+            });
+            
+            snapshot.facturacionTotal = parseFloat(snapshot.facturacionTotal.toFixed(2));
+            
+            // Guardar en histórico
+            monthlyHistory[monthKey] = snapshot;
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(monthlyHistory));
+        }
+
+        // Calcular días del mes
+        function getDaysInMonth(month, year) {
+            return new Date(year, month, 0).getDate();
+        }
+
+        // Calcular facturación
+        function calculateBilling(days) {
+            const baseRate = parseFloat(document.getElementById('baseRate').value);
+            const dailyRate = baseRate / 30;
+            return (days * dailyRate).toFixed(2);
+        }
+
+        // Calcular días facturables
+        function calculateDays(panel, month, year) {
+            const daysInMonth = Math.min(getDaysInMonth(month, year), 30); // Base 30
+            
+            if (panel.fechaInstalacion) {
+                const installDate = new Date(panel.fechaInstalacion);
+                if (installDate.getMonth() + 1 == month && installDate.getFullYear() == year) {
+                    return daysInMonth - installDate.getDate() + 1;
+                }
+            }
+            
+            if (panel.fechaDesmontaje) {
+                const dismountDate = new Date(panel.fechaDesmontaje);
+                if (dismountDate.getMonth() + 1 == month && dismountDate.getFullYear() == year) {
+                    return dismountDate.getDate();
+                }
+            }
+            
+            return daysInMonth;
+        }
+
+        // Actualizar tabla
+        function updateTable() {
+            const month = parseInt(document.getElementById('currentMonth').value);
+            const year = parseInt(document.getElementById('currentYear').value);
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            let totalRevenue = 0;
+            let partialCount = 0;
+            const municipios = new Set();
+
+            panelsData.forEach((panel, index) => {
+                const days = calculateDays(panel, month, year);
+                const billing = calculateBilling(days);
+                totalRevenue += parseFloat(billing);
+                municipios.add(panel.municipio);
+
+                if (days < 30) partialCount++;
+
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${panel.municipio}</td>
+                    <td>${panel.codigo}</td>
+                    <td>${days} días</td>
+                    <td>${billing} €</td>
+                    <td>${days < 30 ? '<span class="partial-badge">Parcial</span>' : 'Completo'}</td>
+                    <td class="actions">
+                        <button class="btn-small btn-danger" onclick="deletePanel(${index})">Eliminar</button>
+                    </td>
+                `;
+            });
+
+            // Actualizar estadísticas
+            document.getElementById('totalPanels').textContent = panelsData.length;
+            document.getElementById('totalRevenue').textContent = totalRevenue.toFixed(2).replace('.', ',') + ' €';
+            document.getElementById('totalMunicipios').textContent = municipios.size;
+            document.getElementById('partialPanels').textContent = partialCount;
+        }
+
+        // Filtrar tabla
+        function filterTable() {
+            const input = document.getElementById('searchInput').value.toUpperCase();
+            const table = document.getElementById('panelsTable');
+            const tr = table.getElementsByTagName('tr');
+
+            for (let i = 1; i < tr.length; i++) {
+                const tdMunicipio = tr[i].getElementsByTagName('td')[0];
+                const tdCodigo = tr[i].getElementsByTagName('td')[1];
+                if (tdMunicipio || tdCodigo) {
+                    const txtMunicipio = tdMunicipio.textContent || tdMunicipio.innerText;
+                    const txtCodigo = tdCodigo.textContent || tdCodigo.innerText;
+                    if (txtMunicipio.toUpperCase().indexOf(input) > -1 || 
+                        txtCodigo.toUpperCase().indexOf(input) > -1) {
+                        tr[i].style.display = '';
+                    } else {
+                        tr[i].style.display = 'none';
+                    }
+                }
+            }
+        }
+
+        // Modales
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function addPanel() {
+            openModal('addPanelModal');
+        }
+
+        function removePanel() {
+            openModal('removePanelModal');
+        }
+
+        function dismountPanel() {
+            openModal('dismountPanelModal');
+        }
+
+        function saveNewPanel() {
+            const municipio = document.getElementById('newMunicipio').value.trim();
+            const codigo = document.getElementById('newCodigo').value.trim();
+            const fecha = document.getElementById('newFechaInstalacion').value;
+
+            if (!municipio || !codigo) {
+                alert('Por favor completa todos los campos');
+                return;
+            }
+
+            panelsData.push({
+                municipio: municipio,
+                codigo: codigo,
+                fechaInstalacion: fecha || null,
+                fechaDesmontaje: null
+            });
+
+            saveData();
+            updateTable();
+            closeModal('addPanelModal');
+            
+            // Limpiar formulario
+            document.getElementById('newMunicipio').value = '';
+            document.getElementById('newCodigo').value = '';
+            document.getElementById('newFechaInstalacion').value = '';
+        }
+
+        function confirmRemovePanel() {
+            const codigo = document.getElementById('removeCodigo').value.trim();
+            const index = panelsData.findIndex(p => p.codigo === codigo);
+
+            if (index === -1) {
+                alert('Panel no encontrado');
+                return;
+            }
+
+            if (confirm(`¿Eliminar panel ${codigo}?`)) {
+                panelsData.splice(index, 1);
+                saveData();
+                updateTable();
+                closeModal('removePanelModal');
+                document.getElementById('removeCodigo').value = '';
+            }
+        }
+
+        function confirmDismountPanel() {
+            const codigo = document.getElementById('dismountCodigo').value.trim();
+            const fecha = document.getElementById('dismountFecha').value;
+            const index = panelsData.findIndex(p => p.codigo === codigo);
+
+            if (index === -1) {
+                alert('Panel no encontrado');
+                return;
+            }
+
+            if (!fecha) {
+                alert('Por favor indica la fecha de desmontaje');
+                return;
+            }
+
+            panelsData[index].fechaDesmontaje = fecha;
+            saveData();
+            updateTable();
+            closeModal('dismountPanelModal');
+            
+            document.getElementById('dismountCodigo').value = '';
+            document.getElementById('dismountFecha').value = '';
+        }
+
+        function deletePanel(index) {
+            if (confirm('¿Eliminar este panel?')) {
+                panelsData.splice(index, 1);
+                saveData();
+                updateTable();
+            }
+        }
+
+        // Exportar a CSV
+        function exportData() {
+            const month = document.getElementById('currentMonth').value;
+            const year = document.getElementById('currentYear').value;
+            
+            let csv = 'Municipio,Código Parada,Días,Facturación\n';
+            
+            panelsData.forEach(panel => {
+                const days = calculateDays(panel, parseInt(month), parseInt(year));
+                const billing = calculateBilling(days);
+                csv += `${panel.municipio},${panel.codigo},${days},${billing}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `paneles_${month}_${year}.csv`;
+            a.click();
+        }
+
+        // Procesar cambios mensuales desde Excel
+        function processMonthlyChanges() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.xlsx,.xls';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    try {
+                        const data = new Uint8Array(event.target.result);
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        
+                        let altas = 0, bajas = 0, desmontajes = 0;
+                        const errors = [];
+                        
+                        // Procesar ALTAS
+                        if (workbook.SheetNames.includes('ALTAS')) {
+                            const sheet = workbook.Sheets['ALTAS'];
+                            const jsonData = XLSX.utils.sheet_to_json(sheet, {header: 1, raw: false});
+                            
+                            for (let i = 1; i < jsonData.length; i++) {
+                                const row = jsonData[i];
+                                if (row[0] && row[1]) {
+                                    const municipio = row[0].toString().trim();
+                                    const codigo = row[1].toString().trim();
+                                    let fechaInstalacion = null;
+                                    
+                                    if (row[2]) {
+                                        fechaInstalacion = parseExcelDate(row[2]);
+                                    }
+                                    
+                                    if (municipio && codigo) {
+                                        panelsData.push({
+                                            municipio: municipio,
+                                            codigo: codigo,
+                                            fechaInstalacion: fechaInstalacion,
+                                            fechaDesmontaje: null
+                                        });
+                                        altas++;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Procesar BAJAS
+                        if (workbook.SheetNames.includes('BAJAS')) {
+                            const sheet = workbook.Sheets['BAJAS'];
+                            const jsonData = XLSX.utils.sheet_to_json(sheet, {header: 1, raw: false});
+                            
+                            for (let i = 1; i < jsonData.length; i++) {
+                                const row = jsonData[i];
+                                if (row[0]) {
+                                    const codigo = row[0].toString().trim();
+                                    const index = panelsData.findIndex(p => p.codigo === codigo);
+                                    
+                                    if (index !== -1) {
+                                        panelsData.splice(index, 1);
+                                        bajas++;
+                                    } else {
+                                        errors.push(`Panel ${codigo} no encontrado (BAJAS)`);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Procesar DESMONTAJES
+                        if (workbook.SheetNames.includes('DESMONTAJES')) {
+                            const sheet = workbook.Sheets['DESMONTAJES'];
+                            const jsonData = XLSX.utils.sheet_to_json(sheet, {header: 1, raw: false});
+                            
+                            for (let i = 1; i < jsonData.length; i++) {
+                                const row = jsonData[i];
+                                if (row[0] && row[1]) {
+                                    const codigo = row[0].toString().trim();
+                                    const fechaDesmontaje = parseExcelDate(row[1]);
+                                    const index = panelsData.findIndex(p => p.codigo === codigo);
+                                    
+                                    if (index !== -1) {
+                                        panelsData[index].fechaDesmontaje = fechaDesmontaje;
+                                        desmontajes++;
+                                    } else {
+                                        errors.push(`Panel ${codigo} no encontrado (DESMONTAJES)`);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        saveData();
+                        updateTable();
+                        
+                        let mensaje = `✅ Cambios procesados correctamente:\n\n`;
+                        mensaje += `• ${altas} altas\n`;
+                        mensaje += `• ${bajas} bajas\n`;
+                        mensaje += `• ${desmontajes} desmontajes`;
+                        
+                        if (errors.length > 0) {
+                            mensaje += `\n\n⚠️ Errores encontrados:\n${errors.join('\n')}`;
+                        }
+                        
+                        alert(mensaje);
+                        
+                    } catch (error) {
+                        alert('❌ Error al procesar el archivo: ' + error.message);
+                        console.error(error);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            };
+            input.click();
+        }
+
+        function parseExcelDate(value) {
+            if (!value) return null;
+            
+            // Si es string en formato DD/MM/YYYY
+            if (typeof value === 'string') {
+                const parts = value.split('/');
+                if (parts.length === 3) {
+                    const day = parts[0].padStart(2, '0');
+                    const month = parts[1].padStart(2, '0');
+                    const year = parts[2];
+                    return `${year}-${month}-${day}`;
+                }
+                
+                // Intentar otros formatos
+                const date = new Date(value);
+                if (!isNaN(date.getTime())) {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                }
+            }
+            
+            // Si es número (Excel serial date)
+            if (typeof value === 'number') {
+                const date = new Date((value - 25569) * 86400 * 1000);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            }
+            
+            return null;
+        }
+
+        // Importar datos
+        function importData() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.csv,.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const content = event.target.result;
+                        if (file.name.endsWith('.json')) {
+                            panelsData = JSON.parse(content);
+                        } else {
+                            // Parsear CSV
+                            const lines = content.split('\n');
+                            panelsData = [];
+                            for (let i = 1; i < lines.length; i++) {
+                                const parts = lines[i].split(',');
+                                if (parts.length >= 2 && parts[0].trim()) {
+                                    panelsData.push({
+                                        municipio: parts[0].trim(),
+                                        codigo: parts[1].trim(),
+                                        fechaInstalacion: null,
+                                        fechaDesmontaje: null
+                                    });
+                                }
+                            }
+                        }
+                        saveData();
+                        updateTable();
+                        alert('Datos importados correctamente');
+                    } catch (error) {
+                        alert('Error al importar: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        // Ver histórico mensual
+        function viewHistory() {
+            const historyContent = document.getElementById('historyContent');
+            
+            if (Object.keys(monthlyHistory).length === 0) {
+                historyContent.innerHTML = '<p style="text-align: center; padding: 20px; color: var(--muted);">No hay histórico guardado aún.</p>';
+            } else {
+                let html = '<table style="width: 100%; border-collapse: collapse;">';
+                html += '<thead><tr style="background: var(--bg); color: white;">';
+                html += '<th style="padding: 10px; text-align: left;">Mes/Año</th>';
+                html += '<th style="padding: 10px; text-align: center;">Paneles</th>';
+                html += '<th style="padding: 10px; text-align: right;">Facturación</th>';
+                html += '<th style="padding: 10px; text-align: center;">Fecha Guardado</th>';
+                html += '</tr></thead><tbody>';
+                
+                // Ordenar por fecha
+                const sortedKeys = Object.keys(monthlyHistory).sort().reverse();
+                
+                sortedKeys.forEach((key, index) => {
+                    const record = monthlyHistory[key];
+                    const bgColor = index % 2 === 0 ? 'var(--bg-soft)' : 'var(--card)';
+                    const fecha = new Date(record.fecha);
+                    const fechaFormat = fecha.toLocaleDateString('es-ES');
+                    
+                    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                                       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                    const monthName = monthNames[parseInt(record.mes) - 1];
+                    
+                    html += `<tr style="background: ${bgColor};">`;
+                    html += `<td style="padding: 10px; color: var(--text);"><strong>${monthName} ${record.año}</strong></td>`;
+                    html += `<td style="padding: 10px; text-align: center; color: var(--text);">${record.totalPaneles}</td>`;
+                    html += `<td style="padding: 10px; text-align: right; color: var(--text);">${record.facturacionTotal.toFixed(2)} €</td>`;
+                    html += `<td style="padding: 10px; text-align: center; font-size: 13px; color: var(--muted);">${fechaFormat}</td>`;
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table>';
+                historyContent.innerHTML = html;
+            }
+            
+            openModal('historyModal');
+        }
+
+        // Exportar histórico completo
+        function exportHistory() {
+            if (Object.keys(monthlyHistory).length === 0) {
+                alert('No hay histórico para exportar');
+                return;
+            }
+            
+            let csv = 'Mes,Año,Total Paneles,Facturación Total,Fecha Guardado\n';
+            
+            const sortedKeys = Object.keys(monthlyHistory).sort();
+            sortedKeys.forEach(key => {
+                const record = monthlyHistory[key];
+                const fecha = new Date(record.fecha).toLocaleDateString('es-ES');
+                const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                                   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                const monthName = monthNames[parseInt(record.mes) - 1];
+                
+                csv += `${monthName},${record.año},${record.totalPaneles},${record.facturacionTotal.toFixed(2)},${fecha}\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `historico_completo_paneles.csv`;
+            a.click();
+        }
+
+        // Cargar mes específico del histórico
+        function loadMonthFromHistory() {
+            if (Object.keys(monthlyHistory).length === 0) {
+                alert('No hay histórico guardado');
+                return;
+            }
+            
+            const month = document.getElementById('currentMonth').value;
+            const year = document.getElementById('currentYear').value;
+            const monthKey = `${year}-${month}`;
+            
+            if (monthlyHistory[monthKey]) {
+                if (confirm(`¿Cargar datos guardados de ${month}/${year}?\n\nEsto reemplazará los datos actuales.`)) {
+                    panelsData = JSON.parse(JSON.stringify(monthlyHistory[monthKey].paneles));
+                    saveData();
+                    updateTable();
+                    alert('Datos del histórico cargados correctamente');
+                }
+            } else {
+                alert(`No hay datos guardados para ${month}/${year}`);
+            }
+        }
+
+        // Hacer backup completo (datos actuales + histórico)
+        function backupComplete() {
+            const backup = {
+                fecha_backup: new Date().toISOString(),
+                datos_actuales: panelsData,
+                historico_mensual: monthlyHistory,
+                mes_actual: document.getElementById('currentMonth').value,
+                año_actual: document.getElementById('currentYear').value
+            };
+            
+            const json = JSON.stringify(backup, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const fecha = new Date().toISOString().split('T')[0];
+            a.href = url;
+            a.download = `backup_completo_${fecha}.json`;
+            a.click();
+            
+            alert('✅ Backup completo creado\n\nIncluye:\n• Datos actuales\n• Todo el histórico mensual\n• Configuración actual');
+        }
+
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', () => {
+            loadInitialData();
+            document.getElementById('currentMonth').addEventListener('change', updateTable);
+            document.getElementById('currentYear').addEventListener('change', updateTable);
+            document.getElementById('baseRate').addEventListener('change', updateTable);
+        });
+    </script>
+</body>
+</html>
+<!-- Cambios de estilo aplicados -->
