@@ -1,0 +1,26 @@
+{
+  "name": "gestion-paneles-tft-crtm",
+  "version": "1.0.0",
+  "description": "Sistema de gestión de paneles TFT para CRTM con Firestore",
+  "type": "module",
+  "scripts": {
+    "deploy": "firebase deploy",
+    "deploy:hosting": "firebase deploy --only hosting",
+    "deploy:firestore": "firebase deploy --only firestore",
+    "serve": "firebase hosting:channel:deploy preview --expires 7d",
+    "serve:local": "firebase serve",
+    "logs": "firebase functions:log"
+  },
+  "keywords": [
+    "firebase",
+    "firestore",
+    "tft",
+    "crtm",
+    "paneles"
+  ],
+  "author": "UTE CRTM",
+  "license": "ISC",
+  "devDependencies": {
+    "firebase-tools": "^14.23.0"
+  }
+}
