@@ -29,7 +29,7 @@
       import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js';
       
       // ============================================
-      // CONFIGURACIÓNN FIREBASE
+      // CONFIGURACIÓN“N FIREBASE
       // ============================================
       const firebaseConfig = {
         apiKey: "AIzaSyBtOWKZh8WelWpsXIbsk_AWb7hBSJVUP3Y",
@@ -48,15 +48,63 @@
     // Configurar persistencia de sesión
       setPersistence(auth, browserLocalPersistence);
       
-    console.log(' Firebase inicializado correctamente');
+    console.log('✓ Firebase inicializado correctamente');
       
             // ============================================
             // FUNCIONES DE CONTROL DE PANTALLAS
             // ============================================
 
+            // Normalizador de acentos/símbolos para corregir textos mal codificados en el DOM
+            function normalizeAccents(root = document.body) {
+                const pairs = [
+                    ['Ã¡','á'], ['Ã©','ñ'], ['Ã­','í'], ['Ã³','ñ'], ['Ãº','ú'],
+                    ['Ã','Á'], ['Ã‰','ñ'], ['Ã','Í'], ['Ã“','ñ'], ['Ãš','Ú'],
+                    ['Ã±','ñ'], ['Ã‘','Ñ'], ['Ã¼','ü'], ['Ãœ','Ü'],
+                    ['Â¿','¿'], ['Â¡','¡'], ['Âº','º'], ['Âª','ª'], ['Â·','·'], ['Â',''],
+                      ['â€“','–'], ['â€”','—'], ['â€¦','…'], ['â€œ','“'], ['â€','”'], ['â€¢','•'],
+                      ['â‚¬','€'], ['â„¢','™'], ['âœ…','✓'], ['âŒ','✖'], ['âš ï¸','⚠️'],
+                      ['‚¬','€'], ['œ…','✓'], ['ñ—','×'], ['ðŸ“',''], ['ðŸ“…',''], ['ðŸ“ˆ',''], ['ðŸ“‰',''], ['ðŸ“¦',''], ['ðŸ’°',''],
+                      ['ñ³','ñ'], ['ñº','ñ']
+                ];
+
+                const replaceAll = (text) => {
+                    let out = text;
+                    for (const [k, v] of pairs) {
+                        if (out && out.includes(k)) out = out.split(k).join(v);
+                    }
+                    return out;
+                };
+
+                // Corrige título
+                if (document.title) document.title = replaceAll(document.title);
+
+                // Corrige nodos de texto
+                const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+                const toUpdate = [];
+                while (walker.nextNode()) toUpdate.push(walker.currentNode);
+                for (const node of toUpdate) {
+                    const fixed = replaceAll(node.nodeValue);
+                    if (fixed !== node.nodeValue) node.nodeValue = fixed;
+                }
+
+                // Corrige atributos comunes
+                const attrNames = ['placeholder', 'title', 'aria-label', 'alt', 'value'];
+                root.querySelectorAll('*').forEach(el => {
+                    for (const a of attrNames) {
+                        if (el.hasAttribute(a)) {
+                            const val = el.getAttribute(a);
+                            const fixed = replaceAll(val);
+                            if (fixed !== val) el.setAttribute(a, fixed);
+                        }
+                    }
+                });
+            }
+      
             function mostrarPantallaLogin() {
         const loginScreen = document.getElementById('loginScreen');
         if (loginScreen) loginScreen.style.display = 'flex';
+                // Normaliza posibles textos mal codificados
+                normalizeAccents();
       }
       
       function ocultarPantallaLogin() {
@@ -67,24 +115,28 @@
             function mostrarAplicacion() {
         const appContainer = document.getElementById('appContainer');
         if (appContainer) appContainer.classList.add('visible');
+                // Normaliza textos de toda la app (cabecera, cards, listas, etc.)
+                normalizeAccents();
       }
       
             function ocultarAplicacion() {
         const appContainer = document.getElementById('appContainer');
         if (appContainer) appContainer.classList.remove('visible');
       }
-      
+
+            // Normaliza al cargar el documento por primera vez
+            document.addEventListener('DOMContentLoaded', () => normalizeAccents());
       
       async function iniciarAplicacion(user) {
-        console.log(' Iniciando aplicación para:', user.email);
+        console.log('½ Iniciando aplicaciñ³n para:', user.email);
         
-        // Actualizar información del usuario en el header
+        // Actualizar informaciñ³n del usuario en el header
         const userPhoto = document.getElementById('userPhoto');
         const userName = document.getElementById('userName');
         const userEmail = document.getElementById('userEmail');
         
         if (userPhoto) {
-          userPhoto.src = user.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><circle cx="25" cy="25" r="25" fill="%231e3a5f"/><text x="25" y="32" text-anchor="middle" fill="white" font-size="20" font-family="Arial"></text></svg>';
+          userPhoto.src = user.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><circle cx="25" cy="25" r="25" fill="%231e3a5f"/><text x="25" y="32" text-anchor="middle" fill="white" font-size="20" font-family="Arial">ðŸ‘¤</text></svg>';
         }
         if (userName) userName.textContent = user.displayName || 'Usuario';
         if (userEmail) userEmail.textContent = user.email;
@@ -100,7 +152,7 @@
       }
       
       function cerrarAplicacion() {
-        console.log(' Cerrando aplicación');
+        console.log('”’ Cerrando aplicaciñ³n');
         
         // Ocultar app y mostrar login
         ocultarAplicacion();
@@ -111,43 +163,70 @@
       }
       
       // ============================================
-      // EXPONER VARIABLES AL SCOPE GLOBAL PRIMERO
+      // FUNCIONES DE AUTENTICACIñ“N
       // ============================================
       
-      // Hacer disponibles globalmente
-      window.firebaseApp = app;
-      window.firebaseDB = db;
-      window.firebaseAuth = auth;
-      window.GoogleAuthProvider = GoogleAuthProvider;
-      window.signInWithPopup = signInWithPopup;
-      window.signOut = signOut;
-      window.onAuthStateChanged = onAuthStateChanged;
+      window.iniciarSesionConGoogle = async function() {
+        const provider = new GoogleAuthProvider();
+        
+        try {
+          const result = await signInWithPopup(auth, provider);
+          console.log('Login exitoso:', result.user.email);
+          
+        } catch (error) {
+          console.error('Error en login:', error);
+          
+          if (error.code === 'auth/popup-closed-by-user') {
+            alert('Inicio de sesion cancelado');
+          } else if (error.code === 'auth/network-request-failed') {
+            alert('No hay conexion. Verifica tu internet');
+          } else if (error.code === 'auth/unauthorized-domain') {
+            alert('Dominio no autorizado. Contacta al administrador');
+          } else {
+            alert('Error al iniciar sesion. Intenta de nuevo');
+          }
+        }
+      };
+      
+      window.cerrarSesion = async function() {
+    const confirmar = confirm('¿Seguro que quieres cerrar sesión?');
+        
+        if (!confirmar) return;
+        
+        try {
+          await signOut(auth);
+          console.log('✓ Logout exitoso');
+        } catch (error) {
+          console.error('✖ Error en logout:', error);
+          alert('Error al cerrar sesión');
+        }
+      };
       
       // ============================================
-      // MONITOREAR ESTADO DE AUTENTICACIÓN
+      // MONITOREAR ESTADO DE AUTENTICACIñ“N
       // ============================================
       
       onAuthStateChanged(auth, async (user) => {
         if (user) {
           // Usuario autenticado
-          console.log(' Usuario autenticado:', user.email);
+          console.log('‘¤ Usuario autenticado:', user.email);
           await iniciarAplicacion(user);
         } else {
           // Usuario no autenticado
-          console.log(' Usuario no autenticado');
+          console.log('‘¤ Usuario no autenticado');
           cerrarAplicacion();
         }
       });
       
       // ============================================
-      // FUNCIñN PARA CARGAR PANELES DESDE FIRESTORE
+      // FUNCIñ“N PARA CARGAR PANELES DESDE FIRESTORE
       // ============================================
       
       window.cargarPanelesDesdeFirestore = async function() {
         try {
-          console.log(' Cargando paneles desde Firestore...');
+          console.log('“¥ Cargando paneles desde Firestore...');
           
-          // Verificar que el usuario esté autenticado
+          // Verificar que el usuario estñ© autenticado
           if (!auth.currentUser) {
             throw new Error('No hay usuario autenticado');
           }
@@ -169,33 +248,32 @@
             });
           });
           
-          console.log(` ${panelesFirestore.length} paneles cargados desde Firestore`);
+          console.log(`✓ ${panelesFirestore.length} paneles cargados desde Firestore`);
           
           return panelesFirestore;
         } catch (error) {
-          console.error(' Error al cargar desde Firestore:', error);
+          console.error('✖ Error al cargar desde Firestore:', error);
           
-          // Si es error de autenticación, mostrar mensaje especial
+          // Si es error de autenticaciñ³n, mostrar mensaje especial
           if (error.code === 'permission-denied' || error.message.includes('autenticado')) {
-            alert(' sesión expirada. Por favor inicia sesión de nuevo');
+            alert('✖ sesión expirada. Por favor inicia sesión de nuevo');
             await signOut(auth);
           }
           
           return [];
         }
       };
-
       
-      
+      // Hacer disponibles globalmente
+      window.firebaseApp = app;
+      window.firebaseDB = db;
+      window.firebaseAuth = auth;
     </script>
-    
-    <!-- Script de autenticación (NO module para onclick) -->
-    <script src="auth.js"></script>
     
     <style>
         /* ============================================
-           DISEÑO MINIMALISTA ESPAÑOL
-           Inspiración: Stripe, Vercel, GitHub moderno
+           DISEñ‘O MINIMALISTA ESPAñ‘OL
+           Inspiraciñ³n: Stripe, Vercel, GitHub moderno
            ============================================ */
         :root {
             /* Colores minimalistas */
@@ -339,7 +417,7 @@
         }
 
         /* ============================================
-           SECCIñN PRINCIPAL
+           SECCIñ“N PRINCIPAL
            ============================================ */
         .minimal-main {
             max-width: 1200px;
@@ -362,7 +440,7 @@
         }
 
         /* ============================================
-           CARDS DE ESTADñSTICAS XXL
+           CARDS DE ESTADñSTICAS XXL
            ============================================ */
         .minimal-stats {
             display: grid;
@@ -580,7 +658,7 @@
         }
 
         /* ============================================
-           BOTñN FLOTANTE
+           BOTñ“N FLOTANTE
            ============================================ */
         .minimal-fab {
             position: fixed;
@@ -613,7 +691,7 @@
         }
 
         /* ============================================
-           SECCIñN DE PANELES
+           SECCIñ“N DE PANELES
            ============================================ */
         .minimal-panels-section {
             margin-top: var(--space-2xl);
@@ -777,7 +855,7 @@
         }
 
         /* ============================================
-           ESTILOS COMPATIBLES CON CñDIGO EXISTENTE
+           ESTILOS COMPATIBLES CON Cñ“DIGO EXISTENTE
            ============================================ */
         .vesta-nav {
             display: flex;
@@ -943,7 +1021,7 @@
         }
 
         /* ============================================
-           BOTONES DE ACCIñN
+           BOTONES DE ACCIñ“N
            ============================================ */
         .vesta-btn-action {
             width: 36px;
@@ -995,7 +1073,7 @@
         }
 
         /* ============================================
-           BOTñN FLOTANTE (+)
+           BOTñ“N FLOTANTE (+)
            ============================================ */
         .vesta-fab {
             position: fixed;
@@ -1624,7 +1702,7 @@
             margin-bottom: 24px;
         }
 
-        /* Estilos para botón principal de Cambios del mes */
+        /* Estilos para botñ³n principal de Cambios del mes */
         .btn-primary-large {
             background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
             color: white;
@@ -1858,7 +1936,7 @@
             font-family: inherit;
         }
 
-        /* Vista previa de facturación */
+        /* Vista previa de facturaciñ³n */
         .billing-preview {
             background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%);
             border-radius: 12px;
@@ -1954,7 +2032,7 @@
             margin-top: 2px;
         }
 
-        /* Botones de acción del modal */
+        /* Botones de acciñ³n del modal */
         .modal-actions {
             display: flex;
             gap: 12px;
@@ -1991,7 +2069,7 @@
             background: #E5E7EB;
         }
 
-        /* Colores específicos por tipo de cambio */
+        /* Colores especñ­ficos por tipo de cambio */
         .modal-alta .modal-header {
             background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
             border-bottom-color: #86EFAC;
@@ -2165,7 +2243,7 @@
         }
 
         /* ============================================
-           CONTENEDOR DE APLICACIñN
+           CONTENEDOR DE APLICACIñ“N
            ============================================ */
         #appContainer {
             display: none;
@@ -2221,13 +2299,16 @@
                 <svg width="60" height="60" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
             </div>
             <h1 style="color:rgba(255,255,255,0.95);font-size:2rem;font-weight:700;margin:0 0 0.5rem 0;letter-spacing:-0.5px;">PIVCONTROL</h1>
-            <p style="color:rgba(255,255,255,0.6);font-size:0.95rem;margin:0 0 2.5rem 0;line-height:1.4;">Control mensual de Facturación CRTM-PIV</p>
-            <button onclick="iniciarSesionConGoogle()" style="width:100%;padding:1rem 2rem;border:none;border-radius:50px;background:linear-gradient(90deg,#6366f1 0%,#8b5cf6 50%,#d946ef 100%);color:white;font-size:1rem;font-weight:700;letter-spacing:1px;cursor:pointer;box-shadow:0 4px 15px rgba(139,92,246,0.4);transition:all 0.3s ease;display:flex;align-items:center;justify-content:center;gap:0.75rem;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 20px rgba(139,92,246,0.6)';" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 15px rgba(139,92,246,0.4)';"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>Iniciar sesión con Google</button>
+            <p style="color:rgba(255,255,255,0.6);font-size:0.95rem;margin:0 0 2.5rem 0;line-height:1.4;">Control mensual de facturaciñn CRTM-PIV</p>
+            <button onclick="iniciarSesionConGoogle()" style="width:100%;padding:1rem 2rem;border:none;border-radius:50px;background:linear-gradient(90deg,#6366f1 0%,#8b5cf6 50%,#d946ef 100%);color:white;font-size:1rem;font-weight:700;letter-spacing:1px;cursor:pointer;box-shadow:0 4px 15px rgba(139,92,246,0.4);transition:all 0.3s ease;display:flex;align-items:center;justify-content:center;gap:0.75rem;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 20px rgba(139,92,246,0.6)';" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 15px rgba(139,92,246,0.4)';">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                Iniciar sesión con Google
+            </button>
         </div>
     </div>
 
     <!-- ============================================
-         CONTENEDOR DE LA APLICACIñN (Oculto por defecto)
+         CONTENEDOR DE LA APLICACIñ“N (Oculto por defecto)
          ============================================ -->
     <div id="appContainer">
         <!-- ============================================
@@ -2257,11 +2338,11 @@
              ============================================ -->
         <div class="minimal-main">
             
-            <!-- Título de sección -->
+            <!-- Tñ­tulo de secciñ³n -->
             <h1 class="minimal-section-title">Resumen del mes actual</h1>
-            <p class="minimal-section-subtitle">Control de instalación, mantenimiento y Facturación de paneles TFT</p>
+            <p class="minimal-section-subtitle">Control de instalación, mantenimiento y facturaciñn de paneles TFT</p>
 
-            <!-- Estadísticas XXL -->
+            <!-- Estadñ­sticas XXL -->
             <div class="minimal-stats">
                 <div class="minimal-stat-card">
                     <div class="minimal-stat-label">Paneles</div>
@@ -2274,7 +2355,7 @@
                     <div class="minimal-stat-detail">Temporalmente</div>
                 </div>
                 <div class="minimal-stat-card">
-                    <div class="minimal-stat-label">Facturación</div>
+                    <div class="minimal-stat-label">Facturaciñn</div>
                     <div class="minimal-stat-value" id="statFacturacion">0,00 €</div>
                     <div class="minimal-stat-detail">Mensual</div>
                 </div>
@@ -2292,7 +2373,7 @@
         }
 
         <div class="card">
-            <h2 class="card-title">ï Parámetros</h2>
+            <h2 class="card-title">š™ï¸ Parámetros</h2>
             <div class="control-row">
                 <div class="control-group">
                     <label>Mes Actual</label>
@@ -2324,42 +2405,42 @@
 
         <div class="card">
             <h2 class="card-title">Acciones</h2>
-            <!-- Botón Principal de Cambios Mensuales -->
+            <!-- Botñ³n Principal de Cambios Mensuales -->
             <div class="monthly-changes-container" style="margin-bottom: 20px;">
                 <button id="btnCambiosMes" class="btn-primary-large" onclick="toggleDropdownMenu()">
-                    Cambios del mes <span style="font-size: 12px;">▼</span>
+                    ðŸ“‹ Cambios del mes <span style="font-size: 12px;">–¼</span>
                 </button>
                 
                 <div id="dropdownMenu" class="dropdown-menu hidden">
                     <div class="dropdown-item" data-action="alta" onclick="openModalAlta()">
-                        <span class="dropdown-icon" style="color: #4CAF50;">+</span>
+                        <span class="dropdown-icon" style="color: #4CAF50;">¢</span>
                         <span>Alta de Panel Nuevo</span>
                     </div>
                     <div class="dropdown-item" data-action="reinstalacion" onclick="openModalReinstalacion()">
-                        <span class="dropdown-icon" style="color: #2196F3;">↻</span>
-                        <span>Reinstalación de Panel</span>
+                        <span class="dropdown-icon" style="color: #2196F3;">ðŸ”µ</span>
+                        <span>Reinstalaciñ³n de Panel</span>
                     </div>
                     <div class="dropdown-item" data-action="baja" onclick="openModalBaja()">
-                        <span class="dropdown-icon" style="color: #F44336;"></span>
+                        <span class="dropdown-icon" style="color: #F44336;">½</span>
                         <span>Baja Definitiva de Panel</span>
                     </div>
                     <div class="dropdown-item" data-action="desmontaje" onclick="openModalDesmontaje()">
-                        <span class="dropdown-icon" style="color: #FF9800;"></span>
+                        <span class="dropdown-icon" style="color: #FF9800;">½</span>
                         <span>Desmontaje Temporal</span>
                     </div>
                     <div class="dropdown-item" data-action="tarifa" onclick="openModalCambioTarifa()">
-                        <span class="dropdown-icon" style="color: #9C27B0;"></span>
+                        <span class="dropdown-icon" style="color: #9C27B0;">½</span>
                         <span>Cambio de Tarifa</span>
                     </div>
                 </div>
             </div>
             
             <div class="actions-grid">
-                <button onclick="exportData()" class="btn-primary">Exportar a Excel</button>
-                <button onclick="viewHistory()" class="btn-secondary">Ver histórico mensual</button>
-                <button onclick="viewMonthlyChanges()" class="btn-secondary">Ver cambios del mes</button>
-                <button onclick="exportHistory()" class="btn-secondary">Exportar histórico completo</button>
-                <button onclick="backupComplete()" class="btn-secondary">Copia de seguridad (JSON)</button>
+                <button onclick="exportData()" class="btn-primary">½ Exportar a Excel</button>
+                <button onclick="viewHistory()" class="btn-secondary">📊 Ver histñrico mensual</button>
+                <button onclick="viewMonthlyChanges()" class="btn-secondary">ðŸ“ Ver cambios del mes</button>
+                <button onclick="exportHistory()" class="btn-secondary">💾 Exportar histñrico completo</button>
+                <button onclick="backupComplete()" class="btn-secondary">ðŸ’¾ Copia de seguridad (JSON)</button>
             </div>
         </div>
 
@@ -2367,7 +2448,7 @@
         <div id="modalAlta" class="modal-overlay hidden">
             <div class="modal-content modal-alta">
                 <div class="modal-header">
-                    <h2><span></span> Alta de Panel Nuevo</h2>
+                    <h2><span>¢</span> Alta de Panel Nuevo</h2>
                     <button class="modal-close" onclick="closeModal('modalAlta')">&times;</button>
                 </div>
                 <div class="modal-body">
@@ -2378,11 +2459,11 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="altaCodigo">Código del Panel *</label>
+                        <label for="altaCodigo">Cñdigo del Panel *</label>
                         <input type="text" id="altaCodigo" placeholder="Ej: PIV-001" required>
                     </div>
                     <div class="form-group">
-                        <label for="altaFecha">Fecha de Instalación *</label>
+                        <label for="altaFecha">Fecha de Instalaciñ³n *</label>
                         <input type="date" id="altaFecha" required>
                     </div>
                     <div class="form-group">
@@ -2391,7 +2472,7 @@
                     </div>
                     
                     <div class="billing-preview" id="altaBillingPreview">
-                        <h3> Vista Previa de Facturación</h3>
+                        <h3>💶 Vista Previa de Facturaciñn</h3>
                         <div class="billing-row">
                             <span class="billing-label">Tarifa mensual base:</span>
                             <span class="billing-value">37,70 €</span>
@@ -2412,7 +2493,7 @@
 
                     <div class="modal-actions">
                         <button class="btn-modal-secondary" onclick="closeModal('modalAlta')">Cancelar</button>
-                        <button class="btn-modal-primary" onclick="guardarAlta()"> Dar de Alta</button>
+                        <button class="btn-modal-primary" onclick="guardarAlta()">✓ Dar de Alta</button>
                     </div>
                 </div>
             </div>
@@ -2422,13 +2503,13 @@
         <div id="modalReinstalacion" class="modal-overlay hidden">
             <div class="modal-content modal-reinstalacion">
                 <div class="modal-header">
-                    <h2><span></span> reinstalación de Panel</h2>
+                    <h2><span>ðŸ”µ</span> reinstalación de Panel</h2>
                     <button class="modal-close" onclick="closeModal('modalReinstalacion')">&times;</button>
                 </div>
                 <div class="modal-body">
                     <div class="form-group smart-search">
                         <label for="reinstalacionBuscar">Buscar Panel *</label>
-                        <input type="text" id="reinstalacionBuscar" placeholder="Buscar por Código o municipio..." oninput="buscarPanel('reinstalacion')">
+                        <input type="text" id="reinstalacionBuscar" placeholder="Buscar por Cñdigo o municipio..." oninput="buscarPanel('reinstalacion')">
                         <div id="reinstalacionResults" class="search-results"></div>
                     </div>
                     <div class="form-group">
@@ -2453,13 +2534,13 @@
                     </div>
 
                     <div class="billing-preview" id="reinstalacionBillingPreview">
-                        <h3> Comparación de Facturación</h3>
+                        <h3>ðŸ’° Comparaciñn de Facturaciñn</h3>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación sin reinstalación:</span>
+                            <span class="billing-label">Facturaciñn sin reinstalación:</span>
                             <span class="billing-value" id="reinstalacionSin">-</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación con reinstalación:</span>
+                            <span class="billing-label">Facturaciñn con reinstalación:</span>
                             <span class="billing-value" id="reinstalacionCon">-</span>
                         </div>
                         <div class="billing-row">
@@ -2470,7 +2551,7 @@
 
                     <div class="modal-actions">
                         <button class="btn-modal-secondary" onclick="closeModal('modalReinstalacion')">Cancelar</button>
-                        <button class="btn-modal-primary" onclick="guardarReinstalacion()"> Confirmar reinstalación</button>
+                        <button class="btn-modal-primary" onclick="guardarReinstalacion()">✓ Confirmar reinstalación</button>
                     </div>
                 </div>
             </div>
@@ -2480,13 +2561,13 @@
         <div id="modalBaja" class="modal-overlay hidden">
             <div class="modal-content modal-baja">
                 <div class="modal-header">
-                    <h2><span></span> Baja Definitiva de Panel</h2>
+                    <h2><span>ðŸ”´</span> Baja Definitiva de Panel</h2>
                     <button class="modal-close" onclick="closeModal('modalBaja')">&times;</button>
                 </div>
                 <div class="modal-body">
                     <div class="form-group smart-search">
                         <label for="bajaBuscar">Buscar Panel *</label>
-                        <input type="text" id="bajaBuscar" placeholder="Buscar por Código o municipio..." oninput="buscarPanel('baja')">
+                        <input type="text" id="bajaBuscar" placeholder="Buscar por Cñdigo o municipio..." oninput="buscarPanel('baja')">
                         <div id="bajaResults" class="search-results"></div>
                     </div>
                     <div class="form-group">
@@ -2508,9 +2589,9 @@
                     </div>
 
                     <div class="warning-box">
-                        <div class="warning-box-icon"></div>
+                        <div class="warning-box-icon">⚠️</div>
                         <div class="warning-box-text">
-                            <strong>Atenciñn:</strong> Esta acciñn es definitiva. El panel dejará de facturarse desde este mes en adelante. La Facturación de meses anteriores se conserva.
+                            <strong>Atenciñn:</strong> Esta acciñn es definitiva. El panel dejará de facturarse desde este mes en adelante. La facturaciñn de meses anteriores se conserva.
                         </div>
                     </div>
 
@@ -2520,13 +2601,13 @@
                     </div>
 
                     <div class="billing-preview" id="bajaBillingPreview">
-                        <h3> Impacto en Facturación</h3>
+                        <h3>ðŸ’° Impacto en Facturaciñn</h3>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación mensual actual:</span>
+                            <span class="billing-label">Facturaciñn mensual actual:</span>
                             <span class="billing-value" id="bajaFacturacionActual">-</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación despuñs de baja:</span>
+                            <span class="billing-label">Facturaciñn despuñs de baja:</span>
                             <span class="billing-value">0,00 €</span>
                         </div>
                         <div class="billing-row">
@@ -2537,7 +2618,7 @@
 
                     <div class="modal-actions">
                         <button class="btn-modal-secondary" onclick="closeModal('modalBaja')">Cancelar</button>
-                        <button class="btn-modal-primary" onclick="guardarBaja()" style="background: #DC2626;"> Dar de Baja</button>
+                        <button class="btn-modal-primary" onclick="guardarBaja()" style="background: #DC2626;">✓ Dar de Baja</button>
                     </div>
                 </div>
             </div>
@@ -2547,13 +2628,13 @@
         <div id="modalDesmontaje" class="modal-overlay hidden">
             <div class="modal-content modal-desmontaje">
                 <div class="modal-header">
-                    <h2><span></span> Desmontaje Temporal</h2>
+                    <h2><span> </span> Desmontaje Temporal</h2>
                     <button class="modal-close" onclick="closeModal('modalDesmontaje')">&times;</button>
                 </div>
                 <div class="modal-body">
                     <div class="form-group smart-search">
                         <label for="desmontajeBuscar">Buscar Panel *</label>
-                        <input type="text" id="desmontajeBuscar" placeholder="Buscar por Código o municipio..." oninput="buscarPanel('desmontaje')">
+                        <input type="text" id="desmontajeBuscar" placeholder="Buscar por Cñdigo o municipio..." oninput="buscarPanel('desmontaje')">
                         <div id="desmontagResults" class="search-results"></div>
                     </div>
                     <div class="form-group">
@@ -2579,9 +2660,9 @@
                     </div>
 
                     <div class="billing-preview" id="desmontajeBillingPreview">
-                        <h3> Ajuste de Facturación</h3>
+                        <h3>ðŸ’° Ajuste de Facturaciñn</h3>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación mes completo:</span>
+                            <span class="billing-label">Facturaciñn mes completo:</span>
                             <span class="billing-value">37,70 €</span>
                         </div>
                         <div class="billing-row">
@@ -2589,7 +2670,7 @@
                             <span class="billing-value" id="desmontajeDias">-</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación ajustada:</span>
+                            <span class="billing-label">Facturaciñn ajustada:</span>
                             <span class="billing-value" id="desmontagTotal">-</span>
                         </div>
                         <div class="billing-row">
@@ -2600,7 +2681,7 @@
 
                     <div class="modal-actions">
                         <button class="btn-modal-secondary" onclick="closeModal('modalDesmontaje')">Cancelar</button>
-                        <button class="btn-modal-primary" onclick="guardarDesmontaje()"> Confirmar Desmontaje</button>
+                        <button class="btn-modal-primary" onclick="guardarDesmontaje()">✓ Confirmar Desmontaje</button>
                     </div>
                 </div>
             </div>
@@ -2610,13 +2691,13 @@
         <div id="modalCambioTarifa" class="modal-overlay hidden">
             <div class="modal-content modal-tarifa">
                 <div class="modal-header">
-                    <h2><span></span> Cambio de Tarifa</h2>
+                    <h2><span>£</span> Cambio de Tarifa</h2>
                     <button class="modal-close" onclick="closeModal('modalCambioTarifa')">&times;</button>
                 </div>
                 <div class="modal-body">
                     <div class="form-group smart-search">
                         <label for="tarifaBuscar">Buscar Panel *</label>
-                        <input type="text" id="tarifaBuscar" placeholder="Buscar por Código o municipio..." oninput="buscarPanel('tarifa')">
+                        <input type="text" id="tarifaBuscar" placeholder="Buscar por Cñdigo o municipio..." oninput="buscarPanel('tarifa')">
                         <div id="tarifaResults" class="search-results"></div>
                     </div>
                     <div class="form-group">
@@ -2648,7 +2729,7 @@
                     </div>
 
                     <div class="billing-preview" id="tarifaBillingPreview">
-                        <h3> Impacto del Cambio</h3>
+                        <h3>ðŸ’° Impacto del Cambio</h3>
                         <div class="billing-row">
                             <span class="billing-label">Tarifa actual:</span>
                             <span class="billing-value" id="tarifaActual">-</span>
@@ -2662,14 +2743,14 @@
                             <span class="billing-value" id="tarifaPanelesAfectados">-</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Variación total:</span>
+                            <span class="billing-label">Variaciñ³n total:</span>
                             <span class="billing-value" id="tarifaVariacion">-</span>
                         </div>
                     </div>
 
                     <div class="modal-actions">
                         <button class="btn-modal-secondary" onclick="closeModal('modalCambioTarifa')">Cancelar</button>
-                        <button class="btn-modal-primary" onclick="guardarCambioTarifa()"> Aplicar Cambio</button>
+                        <button class="btn-modal-primary" onclick="guardarCambioTarifa()">✓ Aplicar Cambio</button>
                     </div>
                 </div>
             </div>
@@ -2681,7 +2762,7 @@
                 <div class="value" id="totalPanels">0</div>
             </div>
             <div class="stat-card">
-                <h3>Facturación Mensual</h3>
+                <h3>Facturaciñn Mensual</h3>
                 <div class="value" id="totalRevenue">0,00 €</div>
             </div>
             <div class="stat-card">
@@ -2698,32 +2779,32 @@
             <div class="minimal-section-header">
                 <h2 class="minimal-section-title">Paneles</h2>
                 <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Buscar por municipio o Código..." onkeyup="filterTable()">
+                    <input type="text" id="searchInput" placeholder="Buscar por municipio o Cñdigo..." onkeyup="filterTable()">
                 </div>
             </div>
             <div class="minimal-list" id="panelsList">
-                <!-- Los paneles se cargarán aquí dinámicamente -->
+                <!-- Los paneles se cargarán aquñ­ dinámicamente -->
             </div>
         </div>
     </div>
 
-    <!-- Modal para añadir panel -->
+    <!-- Modal para añ±adir panel -->
     <div id="addPanelModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <span class="close-modal" onclick="closeModal('addPanelModal')">&times;</span>
-                <h2>• Añadir Nuevo Panel</h2>
+                <h2>ž• Añ±adir Nuevo Panel</h2>
             </div>
             <div class="control-group">
                 <label>Municipio</label>
                 <input type="text" id="newMunicipio" placeholder="Ej: Madrid">
             </div>
             <div class="control-group">
-                <label>Código Parada</label>
+                <label>Cñdigo Parada</label>
                 <input type="text" id="newCodigo" placeholder="Ej: 12345">
             </div>
             <div class="control-group">
-                <label>Fecha Instalación</label>
+                <label>Fecha Instalaciñ³n</label>
                 <input type="date" id="newFechaInstalacion">
             </div>
             <div class="control-group" style="margin-top: 20px;">
@@ -2737,10 +2818,10 @@
         <div class="modal-content">
             <div class="modal-header">
                 <span class="close-modal" onclick="closeModal('removePanelModal')">&times;</span>
-                <h2>– Eliminar Panel</h2>
+                <h2>ž– Eliminar Panel</h2>
             </div>
             <div class="control-group">
-                <label>Código Parada</label>
+                <label>Cñdigo Parada</label>
                 <input type="text" id="removeCodigo" placeholder="Ej: 12345">
             </div>
             <div class="control-group" style="margin-top: 20px;">
@@ -2754,10 +2835,10 @@
         <div class="modal-content">
             <div class="modal-header">
                 <span class="close-modal" onclick="closeModal('dismountPanelModal')">&times;</span>
-                <h2> Desmontar Panel</h2>
+                <h2>ðŸ“¦ Desmontar Panel</h2>
             </div>
             <div class="control-group">
-                <label>Código Parada</label>
+                <label>Cñdigo Parada</label>
                 <input type="text" id="dismountCodigo" placeholder="Ej: 12345">
             </div>
             <div class="control-group">
@@ -2770,15 +2851,15 @@
         </div>
     </div>
 
-    <!-- Modal para ver histórico -->
+    <!-- Modal para ver Histñrico -->
     <div id="historyModal" class="modal">
         <div class="modal-content" style="max-width: 800px;">
             <div class="modal-header">
                 <span class="close-modal" onclick="closeModal('historyModal')">&times;</span>
-                <h2> histórico Mensual</h2>
+                <h2>📊 Histñrico Mensual</h2>
             </div>
             <div id="historyContent" style="max-height: 500px; overflow-y: auto;">
-                <p>Cargando histórico...</p>
+                <p>Cargando Histñrico...</p>
             </div>
         </div>
     </div>
@@ -2793,21 +2874,21 @@
         let firestoreLoaded = false;
 
         // ============================================
-        // FUNCIONES PARA PESTAñAS VESTACP
+        // FUNCIONES PARA PESTAñ‘AS VESTACP
         // ============================================
         function cambiarTab(event, tabName) {
             event.preventDefault();
             
-            // Remover clase active de todas las pestañas
+            // Remover clase active de todas las pestañ±as
             document.querySelectorAll('.vesta-nav-tab').forEach(tab => {
                 tab.classList.remove('active');
             });
             
-            // Añadir clase active a la pestaña clickeada
+            // Añ±adir clase active a la pestañ±a clickeada
             event.currentTarget.classList.add('active');
             
-            // Aquí puedes añadir lógica para mostrar/ocultar contenido según la pestaña
-            console.log('Pestaña seleccionada:', tabName);
+            // Aquñ­ puedes añ±adir lñ³gica para mostrar/ocultar contenido segñºn la pestañ±a
+            console.log('Pestañ±a seleccionada:', tabName);
         }
 
         // ============================================
@@ -2815,22 +2896,22 @@
         // ============================================
         function toggleAllPanels() {
             console.log('Toggle all panels');
-            // Implementar lógica de seleccionar/deseleccionar todos
+            // Implementar lñ³gica de seleccionar/deseleccionar todos
         }
 
         function aplicarSeleccionados() {
             console.log('Aplicar a seleccionados');
-            // Implementar lógica de aplicar acción a seleccionados
+            // Implementar lñ³gica de aplicar acciñ³n a seleccionados
         }
 
         function ordenarPor(campo) {
             console.log('Ordenar por:', campo);
-            // La función updateTable ya maneja el ordenamiento
+            // La funciñ³n updateTable ya maneja el ordenamiento
             updateTable();
         }
 
         // ============================================
-        // ACTUALIZAR BADGES EN PESTAñAS
+        // ACTUALIZAR BADGES EN PESTAñ‘AS
         // ============================================
         function actualizarBadges() {
             const totalPaneles = panelsData.length;
@@ -2875,7 +2956,7 @@
 
             // Actualizar stats
             document.getElementById('statActivos').textContent = activos;
-            // En UI el segundo contador muestra Pausados
+            // En UI el segundo contador muestra “Pausados”
             const elPausados = document.getElementById('statDesmontados');
             if (elPausados) elPausados.textContent = pausados;
 
@@ -2888,9 +2969,9 @@
 
 
         // Cargar datos iniciales SOLO desde Firestore
-        // Esta función se llama automáticamente después de autenticación exitosa
+        // Esta funciñ³n se llama automáticamente despuñ©s de autenticaciñ³n exitosa
         async function loadInitialData() {
-            console.log(' Cargando paneles desde Firestore...');
+            console.log('”„ Cargando paneles desde Firestore...');
             
             try {
                 if (!window.cargarPanelesDesdeFirestore) {
@@ -2902,19 +2983,19 @@
                 if (panelesFirestore.length > 0) {
                     panelsData = panelesFirestore;
                     firestoreLoaded = true;
-                    console.log(`… ${panelesFirestore.length} paneles cargados desde Firestore`);
+                    console.log(`œ… ${panelesFirestore.length} paneles cargados desde Firestore`);
                 } else {
                     panelsData = [];
-                    console.warn('ï No se encontraron paneles en Firestore');
-                    alert(' No hay paneles en la base de datos.\n\nUsa el botón "Cambios del mes  Alta" para añadir paneles.');
+                    console.warn('š ï¸ No se encontraron paneles en Firestore');
+                    alert('ðŸ“‹ No hay paneles en la base de datos.\n\nUsa el botñ³n "Cambios del mes †’ Alta" para añ±adir paneles.');
                 }
             } catch (error) {
-                console.error(' Error al cargar desde Firestore:', error);
-                alert(' Error al conectar con Firestore:\n\n' + error.message + '\n\nRecarga la página.');
+                console.error('Œ Error al cargar desde Firestore:', error);
+                alert('Œ Error al conectar con Firestore:\n\n' + error.message + '\n\nRecarga la página.');
                 panelsData = [];
             }
             
-            // Cargar históricos desde localStorage
+            // Cargar histñ³ricos desde localStorage
             const savedHistory = localStorage.getItem(HISTORY_KEY);
             if (savedHistory) {
                 monthlyHistory = JSON.parse(savedHistory);
@@ -2933,16 +3014,16 @@
             updateTable();
         }
         
-        // Exponer función globalmente para que Firebase Auth pueda llamarla
+        // Exponer funciñ³n globalmente para que Firebase Auth pueda llamarla
         window.loadInitialData = loadInitialData;
 
 
-        // Guardar histórico en localStorage (NO paneles, solo históricos)
+        // Guardar histñ³rico en localStorage (NO paneles, solo histñ³ricos)
         function saveData() {
             // Ya NO guardamos panelsData en localStorage
             // Los paneles viven SOLO en Firestore
             
-            // Guardar histórico del mes actual
+            // Guardar histñ³rico del mes actual
             const month = document.getElementById('currentMonth').value;
             const year = document.getElementById('currentYear').value;
             const monthKey = `${year}-${month}`;
@@ -2957,7 +3038,7 @@
                 facturacionTotal: 0
             };
             
-            // Calcular facturación
+            // Calcular facturaciñ³n
             panelsData.forEach(panel => {
                 const facturacion = calcularFacturacion(panel, parseInt(month), parseInt(year));
                 snapshot.facturacionTotal += facturacion.importe;
@@ -2965,12 +3046,12 @@
             
             snapshot.facturacionTotal = parseFloat(snapshot.facturacionTotal.toFixed(2));
             
-            // Guardar en histórico
+            // Guardar en histñ³rico
             monthlyHistory[monthKey] = snapshot;
             localStorage.setItem(HISTORY_KEY, JSON.stringify(monthlyHistory));
         }
 
-        // FUNCIñN CORE: Calcular Facturación de un panel para un mes específico
+        // FUNCIñN CORE: Calcular facturaciñn de un panel para un mes específico
         function calcularFacturacion(panel, mes, year) {
             // Tolerar tarifas como string "37,70" o "37.70" y valores faltantes
             const rawTarifa = (panel && panel.tarifa) != null ? panel.tarifa : 37.70;
@@ -2986,7 +3067,7 @@
             let diasFacturables = diasBase;
             let tipo = 'completo';
 
-            // Detectar fecha de instalación
+            // Detectar fecha de instalaciñ³n
             if (panel.fechaInstalacion) {
                 fechaInstalacion = new Date(panel.fechaInstalacion);
             }
@@ -3011,7 +3092,7 @@
                 fechaDesmontaje.getFullYear() === year) {
                 const diaDesmontaje = fechaDesmontaje.getDate();
                 
-                // Si también se instaló este mes, calcular días entre ambas fechas
+                // Si tambiñn se instalñ este mes, calcular días entre ambas fechas
                 if (tipo === 'parcial_instalacion') {
                     const diaInstalacion = fechaInstalacion.getDate();
                     diasFacturables = diaDesmontaje - diaInstalacion + 1;
@@ -3055,7 +3136,7 @@
             return new Date(year, month, 0).getDate();
         }
 
-        // Calcular Facturación (funciñn legacy - se mantiene por compatibilidad)
+        // Calcular facturaciñn (funciñn legacy - se mantiene por compatibilidad)
         function calculateBilling(days) {
             const baseRate = parseFloat(document.getElementById('baseRate').value);
             const dailyRate = baseRate / 30;
@@ -3116,7 +3197,7 @@
                     <div class="minimal-list-item-info">
                         <div class="minimal-list-item-main">
                             <span class="minimal-list-item-municipio">${panel.municipio}</span>
-                            <span class="minimal-list-item-separator"></span>
+                            <span class="minimal-list-item-separator">·</span>
                             <span class="minimal-list-item-codigo">${panel.codigo}</span>
                         </div>
                         <div class="minimal-list-item-meta">
@@ -3125,7 +3206,7 @@
                                 <span class="minimal-list-item-stat-value">${days}</span>
                             </div>
                             <div class="minimal-list-item-stat">
-                                <span class="minimal-list-item-stat-label">Facturación</span>
+                                <span class="minimal-list-item-stat-label">Facturaciñn</span>
                                 <span class="minimal-list-item-stat-value">${billing} €</span>
                             </div>
                         </div>
@@ -3133,20 +3214,20 @@
                     <div class="minimal-list-item-actions">
                         <span class="minimal-list-item-badge ${estadoClass}">${estadoBadge}</span>
                         <button class="minimal-action-btn delete" onclick="deletePanel(${index})" title="Eliminar">
-                            <span>—ï</span>
+                            <span>ðŸ—‘ï¸</span>
                         </button>
                     </div>
                 `;
                 panelsList.appendChild(listItem);
             });
 
-            // Actualizar estadísticas
+            // Actualizar estadñ­sticas
             document.getElementById('totalPanels').textContent = panelsData.length;
             document.getElementById('totalRevenue').textContent = totalRevenue.toFixed(2).replace('.', ',') + ' €';
             document.getElementById('totalMunicipios').textContent = municipios.size;
             document.getElementById('partialPanels').textContent = partialCount;
 
-            // Actualizar estadísticas VestaCP
+            // Actualizar estadñ­sticas VestaCP
             actualizarEstadisticas();
             actualizarBadges();
         }
@@ -3213,7 +3294,7 @@
                 return;
             }
 
-            if (confirm(`Eliminar panel ${codigo}?`)) {
+            if (confirm(`¿Eliminar panel ${codigo}?`)) {
                 panelsData.splice(index, 1);
                 saveData();
                 updateTable();
@@ -3247,7 +3328,7 @@
         }
 
         function deletePanel(index) {
-            if (confirm('Eliminar este panel?')) {
+            if (confirm('¿Eliminar este panel?')) {
                 panelsData.splice(index, 1);
                 saveData();
                 updateTable();
@@ -3259,7 +3340,7 @@
             const month = document.getElementById('currentMonth').value;
             const year = document.getElementById('currentYear').value;
             
-            let csv = 'Municipio,Código Parada,Días,Facturación\n';
+            let csv = 'Municipio,Cñdigo Parada,Días,Facturaciñn\n';
             
             panelsData.forEach(panel => {
                 const days = calculateDays(panel, parseInt(month), parseInt(year));
@@ -3275,25 +3356,25 @@
             a.click();
         }
 
-        // Función auxiliar para obtener nombre del mes
+        // Funciñ³n auxiliar para obtener nombre del mes
         function getMonthName(month) {
             const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                           'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
             return months[parseInt(month) - 1];
         }
 
-        // Ver histórico mensual
+        // Ver histñ³rico mensual
         function viewHistory() {
             const historyContent = document.getElementById('historyContent');
             
             if (Object.keys(monthlyHistory).length === 0) {
-                historyContent.innerHTML = '<p style="text-align: center; padding: 20px; color: var(--muted);">No hay histórico guardado aún.</p>';
+                historyContent.innerHTML = '<p style="text-align: center; padding: 20px; color: var(--muted);">No hay Histñrico guardado aún.</p>';
             } else {
                 let html = '<table style="width: 100%; border-collapse: collapse;">';
                 html += '<thead><tr style="background: var(--bg); color: white;">';
                 html += '<th style="padding: 10px; text-align: left;">Mes/Año</th>';
                 html += '<th style="padding: 10px; text-align: center;">Paneles</th>';
-                html += '<th style="padding: 10px; text-align: right;">Facturación</th>';
+                html += '<th style="padding: 10px; text-align: right;">Facturaciñn</th>';
                 html += '<th style="padding: 10px; text-align: center;">Fecha Guardado</th>';
                 html += '</tr></thead><tbody>';
                 
@@ -3328,13 +3409,13 @@
         // Ver cambios del mes registrados
         function viewMonthlyChanges() {
             if (Object.keys(monthlyChanges).length === 0) {
-                alert(' No hay cambios mensuales registrados.\n\nLos cambios se registran automáticamente cuando procesas el archivo de cambios mensuales.');
+                alert('ðŸ“‹ No hay cambios mensuales registrados.\n\nLos cambios se registran automáticamente cuando procesas el archivo de cambios mensuales.');
                 return;
             }
             
             let html = '<div style="max-height: 600px; overflow-y: auto;">';
             
-            // Ordenar meses cronológicamente (más reciente primero)
+            // Ordenar meses cronolñ³gicamente (más reciente primero)
             const sortedKeys = Object.keys(monthlyChanges).sort().reverse();
             
             sortedKeys.forEach((monthKey, index) => {
@@ -3359,7 +3440,7 @@
                     html += `<h4 style="color: #059669; margin-bottom: 8px;">Altas (${cambios.altas.length})</h4>`;
                     html += `<table style="width: 100%; font-size: 13px; border-collapse: collapse;">`;
                     html += `<tr style="background: #D1FAE5; font-weight: 600;">`;
-                    html += `<th style="padding: 6px; text-align: left;">Código</th>`;
+                    html += `<th style="padding: 6px; text-align: left;">Cñdigo</th>`;
                     html += `<th style="padding: 6px; text-align: left;">Municipio</th>`;
                     html += `<th style="padding: 6px; text-align: center;">Fecha instalación</th>`;
                     html += `<th style="padding: 6px; text-align: right;">Tarifa</th>`;
@@ -3384,7 +3465,7 @@
                     html += `<h4 style="color: #DC2626; margin-bottom: 8px;">Bajas (${cambios.bajas.length})</h4>`;
                     html += `<table style="width: 100%; font-size: 13px; border-collapse: collapse;">`;
                     html += `<tr style="background: #FEE2E2; font-weight: 600;">`;
-                    html += `<th style="padding: 6px; text-align: left;">Código</th>`;
+                    html += `<th style="padding: 6px; text-align: left;">Cñdigo</th>`;
                     html += `<th style="padding: 6px; text-align: left;">Municipio</th>`;
                     html += `<th style="padding: 6px; text-align: center;">Fecha Baja</th>`;
                     html += `<th style="padding: 6px; text-align: left;">Motivo</th>`;
@@ -3409,7 +3490,7 @@
                     html += `<h4 style="color: #D97706; margin-bottom: 8px;">Desmontajes (${cambios.desmontajes.length})</h4>`;
                     html += `<table style="width: 100%; font-size: 13px; border-collapse: collapse;">`;
                     html += `<tr style="background: #FED7AA; font-weight: 600;">`;
-                    html += `<th style="padding: 6px; text-align: left;">Código</th>`;
+                    html += `<th style="padding: 6px; text-align: left;">Cñdigo</th>`;
                     html += `<th style="padding: 6px; text-align: left;">Municipio</th>`;
                     html += `<th style="padding: 6px; text-align: center;">Fecha Desmontaje</th>`;
                     html += `</tr>`;
@@ -3432,7 +3513,7 @@
                     html += `<h4 style="color: #7C3AED; margin-bottom: 8px;">Cambios de Tarifa (${cambios.cambios_tarifa.length})</h4>`;
                     html += `<table style="width: 100%; font-size: 13px; border-collapse: collapse;">`;
                     html += `<tr style="background: #DDD6FE; font-weight: 600;">`;
-                    html += `<th style="padding: 6px; text-align: left;">Código</th>`;
+                    html += `<th style="padding: 6px; text-align: left;">Cñdigo</th>`;
                     html += `<th style="padding: 6px; text-align: left;">Municipio</th>`;
                     html += `<th style="padding: 6px; text-align: right;">Tarifa Anterior</th>`;
                     html += `<th style="padding: 6px; text-align: right;">Tarifa Nueva</th>`;
@@ -3484,14 +3565,14 @@
             document.body.appendChild(modal);
         }
 
-        // Exportar histórico completo
+        // Exportar histñ³rico completo
         function exportHistory() {
             if (Object.keys(monthlyHistory).length === 0) {
-                alert('No hay histórico para exportar');
+                alert('No hay Histñrico para exportar');
                 return;
             }
             
-            let csv = 'Mes,Año,Total Paneles,Facturación Total,Fecha Guardado\n';
+            let csv = 'Mes,Año,Total Paneles,Facturaciñn Total,Fecha Guardado\n';
             
             const sortedKeys = Object.keys(monthlyHistory).sort();
             sortedKeys.forEach(key => {
@@ -3512,10 +3593,10 @@
             a.click();
         }
 
-        // Cargar mes específico del histórico
+        // Cargar mes especñ­fico del histñ³rico
         function loadMonthFromHistory() {
             if (Object.keys(monthlyHistory).length === 0) {
-                alert('No hay histórico guardado');
+                alert('No hay Histñrico guardado');
                 return;
             }
             
@@ -3524,24 +3605,24 @@
             const monthKey = `${year}-${month}`;
             
             if (monthlyHistory[monthKey]) {
-                if (confirm(`Cargar datos guardados de ${month}/${year}?\n\nEsto reemplazará los datos actuales.`)) {
+                if (confirm(`¿Cargar datos guardados de ${month}/${year}?\n\nEsto reemplazará los datos actuales.`)) {
                     panelsData = JSON.parse(JSON.stringify(monthlyHistory[monthKey].paneles));
                     saveData();
                     updateTable();
-                    alert('Datos del histórico cargados correctamente');
+                    alert('Datos del Histñrico cargados correctamente');
                 }
             } else {
                 alert(`No hay datos guardados para ${month}/${year}`);
             }
         }
 
-        // Hacer backup completo (datos actuales + histórico)
+        // Hacer backup completo (datos actuales + histñ³rico)
         
         // ====================
         // FUNCIONES DEL SISTEMA DE CAMBIOS MENSUALES
         // ====================
 
-        // Función para actualizar dashboard en tiempo real
+        // Funciñ³n para actualizar dashboard en tiempo real
         function actualizarDashboard() {
             const month = parseInt(document.getElementById('currentMonth').value);
             const year = parseInt(document.getElementById('currentYear').value);
@@ -3622,7 +3703,7 @@
             const selectMunicipio = document.getElementById('altaMunicipio');
             const inputFecha = document.getElementById('altaFecha');
             
-            // Poblar municipios únicos
+            // Poblar municipios ñºnicos
             const municipios = [...new Set(panelsData.map(p => p.municipio))].sort();
             selectMunicipio.innerHTML = '<option value="">Seleccionar municipio...</option>';
             municipios.forEach(m => {
@@ -3653,7 +3734,7 @@
             const mes = parseInt(document.getElementById('currentMonth').value);
             const year = parseInt(document.getElementById('currentYear').value);
             
-            // Calcular días a facturar
+            // Calcular dñ­as a facturar
             let diasFacturables = 30;
             if (fechaInstalacion.getMonth() + 1 === mes && fechaInstalacion.getFullYear() === year) {
                 const diaInstalacion = fechaInstalacion.getDate();
@@ -3675,22 +3756,22 @@
 
             // Validaciones
             if (!municipio) {
-                alert('ï Por favor selecciona un municipio');
+                alert('š ï¸ Por favor selecciona un municipio');
                 return;
             }
             if (!codigo) {
-                alert(' Por favor ingresa un Código de panel');
+                alert('⚠️ Por favor ingresa un Cñdigo de panel');
                 return;
             }
             if (!fecha) {
-                alert('ï Por favor selecciona una fecha de instalación');
+                alert('š ï¸ Por favor selecciona una fecha de instalaciñ³n');
                 return;
             }
 
-            // Verificar Código duplicado
+            // Verificar Cñdigo duplicado
             const duplicado = panelsData.find(p => p.codigo.toLowerCase() === codigo.toLowerCase());
             if (duplicado) {
-                alert(` Ya existe un panel con el Código "${codigo}"\n\nPor favor usa un Código diferente.`);
+                alert(`⚠️ Ya existe un panel con el Cñdigo "${codigo}"\n\nPor favor usa un Cñdigo diferente.`);
                 return;
             }
 
@@ -3738,17 +3819,17 @@
                 actualizarDashboard();
                 saveData();
                 
-                alert(` Panel dado de alta exitosamente\n\nCódigo: ${codigo}\nMunicipio: ${municipio}`);
+                alert(`✓ Panel dado de alta exitosamente\n\nCñdigo: ${codigo}\nMunicipio: ${municipio}`);
                 closeModal('modalAlta');
                 
             } catch (error) {
-                console.error(' Error al guardar:', error);
-                alert(` Error al guardar el panel:\n\n${error.message}`);
+                console.error('✖ Error al guardar:', error);
+                alert(`✖ Error al guardar el panel:\n\n${error.message}`);
             }
         }
 
         // ====================
-        // MODAL: REINSTALACIñN
+        // MODAL: REINSTALACIñ“N
         // ====================
 
         let panelSeleccionadoReinstalacion = null;
@@ -3781,7 +3862,7 @@
                 return;
             }
 
-            // Filtrar paneles según el tipo de modal
+            // Filtrar paneles segñºn el tipo de modal
             let resultados = [];
             
             if (modalType === 'reinstalacion') {
@@ -3811,7 +3892,7 @@
                 resultsContainer.innerHTML = resultados.map(p => `
                     <div class="search-result-item" onclick="seleccionarPanel${modalType.charAt(0).toUpperCase() + modalType.slice(1)}('${p.codigo}')">
                         <div class="search-result-codigo">${p.codigo}</div>
-                        <div class="search-result-municipio">${p.municipio}${p.fechaDesmontaje ? '  Desmontado: ' + new Date(p.fechaDesmontaje).toLocaleDateString('es-ES') : ''}</div>
+                        <div class="search-result-municipio">${p.municipio}${p.fechaDesmontaje ? ' · Desmontado: ' + new Date(p.fechaDesmontaje).toLocaleDateString('es-ES') : ''}</div>
                     </div>
                 `).join('');
             }
@@ -3826,7 +3907,7 @@
                 document.getElementById('reinstalacionPanelInfo').innerHTML = `
                     <strong>${panelSeleccionadoReinstalacion.codigo}</strong><br>
                     <span style="color: #64748B; font-size: 13px;">
-                        ${panelSeleccionadoReinstalacion.municipio}  
+                        ${panelSeleccionadoReinstalacion.municipio} · 
                         Desmontado: ${new Date(panelSeleccionadoReinstalacion.fechaDesmontaje).toLocaleDateString('es-ES')}
                     </span>
                 `;
@@ -3838,7 +3919,7 @@
 
         async function guardarReinstalacion() {
             if (!panelSeleccionadoReinstalacion) {
-                alert('ï Por favor selecciona un panel');
+                alert('š ï¸ Por favor selecciona un panel');
                 return;
             }
 
@@ -3847,12 +3928,12 @@
             const nuevoMunicipio = cambioMunicipio ? document.getElementById('reinstalacionNuevoMunicipio').value : null;
 
             if (!fecha) {
-                alert('ï Por favor selecciona una fecha de reinstalación');
+                alert('š ï¸ Por favor selecciona una fecha de reinstalaciñ³n');
                 return;
             }
 
             if (cambioMunicipio && !nuevoMunicipio) {
-                alert('ï Por favor selecciona el nuevo municipio');
+                alert('š ï¸ Por favor selecciona el nuevo municipio');
                 return;
             }
 
@@ -3861,7 +3942,7 @@
                 const panel = panelsData.find(p => p.codigo === panelSeleccionadoReinstalacion.codigo);
                 if (panel) {
                     panel.fechaDesmontaje = null; // Quitar desmontaje
-                    panel.fechaInstalacion = fecha; // Nueva fecha de instalación
+                    panel.fechaInstalacion = fecha; // Nueva fecha de instalaciñ³n
                     
                     if (cambioMunicipio) {
                         panel.municipio = nuevoMunicipio;
@@ -3892,13 +3973,13 @@
                     actualizarDashboard();
                     saveData();
                     
-                    alert(` Panel reinstalado exitosamente\n\nCódigo: ${panel.codigo}\nMunicipio: ${panel.municipio}`);
+                    alert(`✓ Panel reinstalado exitosamente\n\nCñdigo: ${panel.codigo}\nMunicipio: ${panel.municipio}`);
                     closeModal('modalReinstalacion');
                 }
                 
             } catch (error) {
-                console.error(' Error:', error);
-                alert(` Error al reinstalar:\n\n${error.message}`);
+                console.error('✖ Error:', error);
+                alert(`✖ Error al reinstalar:\n\n${error.message}`);
             }
         }
 
@@ -3922,7 +4003,7 @@
                 document.getElementById('bajaPanelInfo').innerHTML = `
                     <strong>${panelSeleccionadoBaja.codigo}</strong><br>
                     <span style="color: #64748B; font-size: 13px;">
-                        ${panelSeleccionadoBaja.municipio}  Tarifa: ${(panelSeleccionadoBaja.tarifa || 37.70).toFixed(2)} €/mes
+                        ${panelSeleccionadoBaja.municipio} · Tarifa: ${(panelSeleccionadoBaja.tarifa || 37.70).toFixed(2)} €/mes
                     </span>
                 `;
                 
@@ -3937,7 +4018,7 @@
 
         async function guardarBaja() {
             if (!panelSeleccionadoBaja) {
-                alert('ï Por favor selecciona un panel');
+                alert('š ï¸ Por favor selecciona un panel');
                 return;
             }
 
@@ -3945,12 +4026,12 @@
             const confirmacion = document.getElementById('bajaConfirmacion').checked;
 
             if (!motivo) {
-                alert('ï Por favor selecciona el motivo de la baja');
+                alert('š ï¸ Por favor selecciona el motivo de la baja');
                 return;
             }
 
             if (!confirmacion) {
-                alert('ï Debes confirmar la baja definitiva del panel');
+                alert('š ï¸ Debes confirmar la baja definitiva del panel');
                 return;
             }
 
@@ -3984,13 +4065,13 @@
                     actualizarDashboard();
                     saveData();
                     
-                    alert(` Panel dado de baja exitosamente\n\nCódigo: ${panelSeleccionadoBaja.codigo}\nMotivo: ${motivo}`);
+                    alert(`✓ Panel dado de baja exitosamente\n\nCñdigo: ${panelSeleccionadoBaja.codigo}\nMotivo: ${motivo}`);
                     closeModal('modalBaja');
                 }
                 
             } catch (error) {
-                console.error(' Error:', error);
-                alert(` Error al dar de baja:\n\n${error.message}`);
+                console.error('✖ Error:', error);
+                alert(`✖ Error al dar de baja:\n\n${error.message}`);
             }
         }
 
@@ -4020,7 +4101,7 @@
                 document.getElementById('desmontajePanelInfo').innerHTML = `
                     <strong>${panelSeleccionadoDesmontaje.codigo}</strong><br>
                     <span style="color: #64748B; font-size: 13px;">
-                        ${panelSeleccionadoDesmontaje.municipio}  Tarifa: ${(panelSeleccionadoDesmontaje.tarifa || 37.70).toFixed(2)} €/mes
+                        ${panelSeleccionadoDesmontaje.municipio} · Tarifa: ${(panelSeleccionadoDesmontaje.tarifa || 37.70).toFixed(2)} €/mes
                     </span>
                 `;
                 
@@ -4057,7 +4138,7 @@
 
         async function guardarDesmontaje() {
             if (!panelSeleccionadoDesmontaje) {
-                alert('ï Por favor selecciona un panel');
+                alert('š ï¸ Por favor selecciona un panel');
                 return;
             }
 
@@ -4065,12 +4146,12 @@
             const motivo = document.getElementById('desmontagMotivo').value;
 
             if (!fecha) {
-                alert('ï Por favor selecciona una fecha de desmontaje');
+                alert('š ï¸ Por favor selecciona una fecha de desmontaje');
                 return;
             }
 
             if (!motivo) {
-                alert('ï Por favor selecciona el motivo del desmontaje');
+                alert('š ï¸ Por favor selecciona el motivo del desmontaje');
                 return;
             }
 
@@ -4105,13 +4186,13 @@
                     actualizarDashboard();
                     saveData();
                     
-                    alert(` Panel desmontado exitosamente\n\nCódigo: ${panel.codigo}\nFecha: ${new Date(fecha).toLocaleDateString('es-ES')}`);
+                    alert(`✓ Panel desmontado exitosamente\n\nCñdigo: ${panel.codigo}\nFecha: ${new Date(fecha).toLocaleDateString('es-ES')}`);
                     closeModal('modalDesmontaje');
                 }
                 
             } catch (error) {
-                console.error(' Error:', error);
-                alert(` Error al desmontar:\n\n${error.message}`);
+                console.error('✖ Error:', error);
+                alert(`✖ Error al desmontar:\n\n${error.message}`);
             }
         }
 
@@ -4135,7 +4216,7 @@
                 document.getElementById('tarifaPanelInfo').innerHTML = `
                     <strong>${panelSeleccionadoTarifa.codigo}</strong><br>
                     <span style="color: #64748B; font-size: 13px;">
-                        ${panelSeleccionadoTarifa.municipio}  Tarifa actual: ${(panelSeleccionadoTarifa.tarifa || 37.70).toFixed(2)} €/mes
+                        ${panelSeleccionadoTarifa.municipio} · Tarifa actual: ${(panelSeleccionadoTarifa.tarifa || 37.70).toFixed(2)} €/mes
                     </span>
                 `;
                 
@@ -4188,7 +4269,7 @@
 
         async function guardarCambioTarifa() {
             if (!panelSeleccionadoTarifa) {
-                alert('ï Por favor selecciona un panel');
+                alert('š ï¸ Por favor selecciona un panel');
                 return;
             }
 
@@ -4196,12 +4277,12 @@
             const alcance = document.querySelector('input[name="tarifaAlcance"]:checked')?.value;
 
             if (!nuevaTarifa || isNaN(nuevaTarifa) || nuevaTarifa <= 0) {
-                alert('ï Por favor ingresa una tarifa válida');
+                alert('š ï¸ Por favor ingresa una tarifa válida');
                 return;
             }
 
             if (!alcance) {
-                alert('ï Por favor selecciona el alcance del cambio');
+                alert('š ï¸ Por favor selecciona el alcance del cambio');
                 return;
             }
 
@@ -4253,12 +4334,12 @@
                 actualizarDashboard();
                 saveData();
                 
-                alert(` Tarifa actualizada exitosamente\n\nPaneles afectados: ${panelesModificados.length}\nNueva tarifa: ${nuevaTarifa.toFixed(2)} €`);
+                alert(`✓ Tarifa actualizada exitosamente\n\nPaneles afectados: ${panelesModificados.length}\nNueva tarifa: ${nuevaTarifa.toFixed(2)} €`);
                 closeModal('modalCambioTarifa');
                 
             } catch (error) {
-                console.error(' Error:', error);
-                alert(` Error al cambiar tarifa:\n\n${error.message}`);
+                console.error('✖ Error:', error);
+                alert(`✖ Error al cambiar tarifa:\n\n${error.message}`);
             }
         }
 
@@ -4284,14 +4365,14 @@
             a.download = `backup_completo_${fecha}.json`;
             a.click();
             
-            alert(' Backup completo creado\n\nIncluye:\n• Datos actuales\n• Todo el histórico mensual\n• CONFIGURACIÓNn actual');
+            alert('✓ Backup completo creado\n\nIncluye:\n• Datos actuales\n• Todo el Histñrico mensual\n• CONFIGURACIÓNn actual');
         }
 
         // Inicializar event listeners
-        // NOTA: loadInitialData() ya NO se llama aquí
-        // Se llama automáticamente después de autenticación exitosa
+        // NOTA: loadInitialData() ya NO se llama aquñ­
+        // Se llama automáticamente despuñ©s de autenticaciñ³n exitosa
         document.addEventListener('DOMContentLoaded', () => {
-            // NO llamar loadInitialData() aquí - se llama en iniciarAplicacion()
+            // NO llamar loadInitialData() aquñ­ - se llama en iniciarAplicacion()
             
             document.getElementById('currentMonth').addEventListener('change', updateTable);
             document.getElementById('currentYear').addEventListener('change', updateTable);
@@ -4329,7 +4410,7 @@
     </script>
 
         <!-- ============================================
-             BOTñN FLOTANTE MINIMALISTA
+             BOTñ“N FLOTANTE MINIMALISTA
              ============================================ -->
         <button class="minimal-fab" onclick="toggleDropdownMenu()" title="añadir nuevo cambio">
             +

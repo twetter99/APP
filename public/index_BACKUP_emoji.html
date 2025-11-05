@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -29,7 +29,7 @@
       import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js';
       
       // ============================================
-      // CONFIGURACIÓNN FIREBASE
+      // CONFIGURACIÓN“N FIREBASE
       // ============================================
       const firebaseConfig = {
         apiKey: "AIzaSyBtOWKZh8WelWpsXIbsk_AWb7hBSJVUP3Y",
@@ -54,9 +54,57 @@
             // FUNCIONES DE CONTROL DE PANTALLAS
             // ============================================
 
+            // Normalizador de acentos/símbolos para corregir textos mal codificados en el DOM
+            function normalizeAccents(root = document.body) {
+                const pairs = [
+                    ['Ã','á'], ['Ã','ñ'], ['Ã','í'], ['Ã','ñ'], ['Ã','ú'],
+                    ['Ã','Á'], ['Ã','ñ'], ['Ã','Í'], ['Ã“','ñ'], ['Ãš','Ú'],
+                    ['Ã','ñ'], ['Ã‘','Ñ'], ['Ã','ü'], ['Ãœ','Ü'],
+                    ['Â',''], ['Â',''], ['Â',''], ['Â',''], ['Â',''], ['Â',''],
+                      ['â€“','–'], ['â€”','—'], ['â€','…'], ['â€œ','“'], ['â€','”'], ['â€','•'],
+                      ['â','€'], ['â',''], ['âœ…',''], ['âŒ',''], ['âšï',''],
+                      ['','€'], ['œ…',''], ['ñ—','×'], ['ðŸ“',''], ['ðŸ“…',''], ['ðŸ“',''], ['ðŸ“',''], ['ðŸ“',''], ['ðŸ’',''],
+                      ['ó','ñ'], ['ú','ñ']
+                ];
+
+                const replaceAll = (text) => {
+                    let out = text;
+                    for (const [k, v] of pairs) {
+                        if (out && out.includes(k)) out = out.split(k).join(v);
+                    }
+                    return out;
+                };
+
+                // Corrige título
+                if (document.title) document.title = replaceAll(document.title);
+
+                // Corrige nodos de texto
+                const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+                const toUpdate = [];
+                while (walker.nextNode()) toUpdate.push(walker.currentNode);
+                for (const node of toUpdate) {
+                    const fixed = replaceAll(node.nodeValue);
+                    if (fixed !== node.nodeValue) node.nodeValue = fixed;
+                }
+
+                // Corrige atributos comunes
+                const attrNames = ['placeholder', 'title', 'aria-label', 'alt', 'value'];
+                root.querySelectorAll('*').forEach(el => {
+                    for (const a of attrNames) {
+                        if (el.hasAttribute(a)) {
+                            const val = el.getAttribute(a);
+                            const fixed = replaceAll(val);
+                            if (fixed !== val) el.setAttribute(a, fixed);
+                        }
+                    }
+                });
+            }
+      
             function mostrarPantallaLogin() {
         const loginScreen = document.getElementById('loginScreen');
         if (loginScreen) loginScreen.style.display = 'flex';
+                // Normaliza posibles textos mal codificados
+                normalizeAccents();
       }
       
       function ocultarPantallaLogin() {
@@ -67,13 +115,17 @@
             function mostrarAplicacion() {
         const appContainer = document.getElementById('appContainer');
         if (appContainer) appContainer.classList.add('visible');
+                // Normaliza textos de toda la app (cabecera, cards, listas, etc.)
+                normalizeAccents();
       }
       
             function ocultarAplicacion() {
         const appContainer = document.getElementById('appContainer');
         if (appContainer) appContainer.classList.remove('visible');
       }
-      
+
+            // Normaliza al cargar el documento por primera vez
+            document.addEventListener('DOMContentLoaded', () => normalizeAccents());
       
       async function iniciarAplicacion(user) {
         console.log(' Iniciando aplicación para:', user.email);
@@ -84,7 +136,7 @@
         const userEmail = document.getElementById('userEmail');
         
         if (userPhoto) {
-          userPhoto.src = user.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><circle cx="25" cy="25" r="25" fill="%231e3a5f"/><text x="25" y="32" text-anchor="middle" fill="white" font-size="20" font-family="Arial"></text></svg>';
+          userPhoto.src = user.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><circle cx="25" cy="25" r="25" fill="%231e3a5f"/><text x="25" y="32" text-anchor="middle" fill="white" font-size="20" font-family="Arial">ðŸ‘</text></svg>';
         }
         if (userName) userName.textContent = user.displayName || 'Usuario';
         if (userEmail) userEmail.textContent = user.email;
@@ -100,7 +152,7 @@
       }
       
       function cerrarAplicacion() {
-        console.log(' Cerrando aplicación');
+        console.log('”’ Cerrando aplicación');
         
         // Ocultar app y mostrar login
         ocultarAplicacion();
@@ -111,41 +163,68 @@
       }
       
       // ============================================
-      // EXPONER VARIABLES AL SCOPE GLOBAL PRIMERO
+      // FUNCIONES DE AUTENTICACIñ“N
       // ============================================
       
-      // Hacer disponibles globalmente
-      window.firebaseApp = app;
-      window.firebaseDB = db;
-      window.firebaseAuth = auth;
-      window.GoogleAuthProvider = GoogleAuthProvider;
-      window.signInWithPopup = signInWithPopup;
-      window.signOut = signOut;
-      window.onAuthStateChanged = onAuthStateChanged;
+      window.iniciarSesionConGoogle = async function() {
+        const provider = new GoogleAuthProvider();
+        
+        try {
+          const result = await signInWithPopup(auth, provider);
+          console.log('Login exitoso:', result.user.email);
+          
+        } catch (error) {
+          console.error('Error en login:', error);
+          
+          if (error.code === 'auth/popup-closed-by-user') {
+            alert('Inicio de sesion cancelado');
+          } else if (error.code === 'auth/network-request-failed') {
+            alert('No hay conexion. Verifica tu internet');
+          } else if (error.code === 'auth/unauthorized-domain') {
+            alert('Dominio no autorizado. Contacta al administrador');
+          } else {
+            alert('Error al iniciar sesion. Intenta de nuevo');
+          }
+        }
+      };
+      
+      window.cerrarSesion = async function() {
+    const confirmar = confirm('Seguro que quieres cerrar sesión?');
+        
+        if (!confirmar) return;
+        
+        try {
+          await signOut(auth);
+          console.log(' Logout exitoso');
+        } catch (error) {
+          console.error(' Error en logout:', error);
+          alert('Error al cerrar sesión');
+        }
+      };
       
       // ============================================
-      // MONITOREAR ESTADO DE AUTENTICACIÓN
+      // MONITOREAR ESTADO DE AUTENTICACIñ“N
       // ============================================
       
       onAuthStateChanged(auth, async (user) => {
         if (user) {
           // Usuario autenticado
-          console.log(' Usuario autenticado:', user.email);
+          console.log('‘ Usuario autenticado:', user.email);
           await iniciarAplicacion(user);
         } else {
           // Usuario no autenticado
-          console.log(' Usuario no autenticado');
+          console.log('‘ Usuario no autenticado');
           cerrarAplicacion();
         }
       });
       
       // ============================================
-      // FUNCIñN PARA CARGAR PANELES DESDE FIRESTORE
+      // FUNCIñ“N PARA CARGAR PANELES DESDE FIRESTORE
       // ============================================
       
       window.cargarPanelesDesdeFirestore = async function() {
         try {
-          console.log(' Cargando paneles desde Firestore...');
+          console.log('“ Cargando paneles desde Firestore...');
           
           // Verificar que el usuario esté autenticado
           if (!auth.currentUser) {
@@ -184,17 +263,16 @@
           return [];
         }
       };
-
       
-      
+      // Hacer disponibles globalmente
+      window.firebaseApp = app;
+      window.firebaseDB = db;
+      window.firebaseAuth = auth;
     </script>
-    
-    <!-- Script de autenticación (NO module para onclick) -->
-    <script src="auth.js"></script>
     
     <style>
         /* ============================================
-           DISEÑO MINIMALISTA ESPAÑOL
+           DISEñ‘O MINIMALISTA ESPAñ‘OL
            Inspiración: Stripe, Vercel, GitHub moderno
            ============================================ */
         :root {
@@ -339,7 +417,7 @@
         }
 
         /* ============================================
-           SECCIñN PRINCIPAL
+           SECCIñ“N PRINCIPAL
            ============================================ */
         .minimal-main {
             max-width: 1200px;
@@ -580,7 +658,7 @@
         }
 
         /* ============================================
-           BOTñN FLOTANTE
+           BOTñ“N FLOTANTE
            ============================================ */
         .minimal-fab {
             position: fixed;
@@ -613,7 +691,7 @@
         }
 
         /* ============================================
-           SECCIñN DE PANELES
+           SECCIñ“N DE PANELES
            ============================================ */
         .minimal-panels-section {
             margin-top: var(--space-2xl);
@@ -777,7 +855,7 @@
         }
 
         /* ============================================
-           ESTILOS COMPATIBLES CON CñDIGO EXISTENTE
+           ESTILOS COMPATIBLES CON Cñ“DIGO EXISTENTE
            ============================================ */
         .vesta-nav {
             display: flex;
@@ -943,7 +1021,7 @@
         }
 
         /* ============================================
-           BOTONES DE ACCIñN
+           BOTONES DE ACCIñ“N
            ============================================ */
         .vesta-btn-action {
             width: 36px;
@@ -995,7 +1073,7 @@
         }
 
         /* ============================================
-           BOTñN FLOTANTE (+)
+           BOTñ“N FLOTANTE (+)
            ============================================ */
         .vesta-fab {
             position: fixed;
@@ -2165,7 +2243,7 @@
         }
 
         /* ============================================
-           CONTENEDOR DE APLICACIñN
+           CONTENEDOR DE APLICACIñ“N
            ============================================ */
         #appContainer {
             display: none;
@@ -2221,13 +2299,16 @@
                 <svg width="60" height="60" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
             </div>
             <h1 style="color:rgba(255,255,255,0.95);font-size:2rem;font-weight:700;margin:0 0 0.5rem 0;letter-spacing:-0.5px;">PIVCONTROL</h1>
-            <p style="color:rgba(255,255,255,0.6);font-size:0.95rem;margin:0 0 2.5rem 0;line-height:1.4;">Control mensual de Facturación CRTM-PIV</p>
-            <button onclick="iniciarSesionConGoogle()" style="width:100%;padding:1rem 2rem;border:none;border-radius:50px;background:linear-gradient(90deg,#6366f1 0%,#8b5cf6 50%,#d946ef 100%);color:white;font-size:1rem;font-weight:700;letter-spacing:1px;cursor:pointer;box-shadow:0 4px 15px rgba(139,92,246,0.4);transition:all 0.3s ease;display:flex;align-items:center;justify-content:center;gap:0.75rem;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 20px rgba(139,92,246,0.6)';" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 15px rgba(139,92,246,0.4)';"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>Iniciar sesión con Google</button>
+            <p style="color:rgba(255,255,255,0.6);font-size:0.95rem;margin:0 0 2.5rem 0;line-height:1.4;">Control mensual de facturaciñn CRTM-PIV</p>
+            <button onclick="iniciarSesionConGoogle()" style="width:100%;padding:1rem 2rem;border:none;border-radius:50px;background:linear-gradient(90deg,#6366f1 0%,#8b5cf6 50%,#d946ef 100%);color:white;font-size:1rem;font-weight:700;letter-spacing:1px;cursor:pointer;box-shadow:0 4px 15px rgba(139,92,246,0.4);transition:all 0.3s ease;display:flex;align-items:center;justify-content:center;gap:0.75rem;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 20px rgba(139,92,246,0.6)';" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 15px rgba(139,92,246,0.4)';">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                Iniciar sesión con Google
+            </button>
         </div>
     </div>
 
     <!-- ============================================
-         CONTENEDOR DE LA APLICACIñN (Oculto por defecto)
+         CONTENEDOR DE LA APLICACIñ“N (Oculto por defecto)
          ============================================ -->
     <div id="appContainer">
         <!-- ============================================
@@ -2259,7 +2340,7 @@
             
             <!-- Título de sección -->
             <h1 class="minimal-section-title">Resumen del mes actual</h1>
-            <p class="minimal-section-subtitle">Control de instalación, mantenimiento y Facturación de paneles TFT</p>
+            <p class="minimal-section-subtitle">Control de instalación, mantenimiento y facturaciñn de paneles TFT</p>
 
             <!-- Estadísticas XXL -->
             <div class="minimal-stats">
@@ -2274,7 +2355,7 @@
                     <div class="minimal-stat-detail">Temporalmente</div>
                 </div>
                 <div class="minimal-stat-card">
-                    <div class="minimal-stat-label">Facturación</div>
+                    <div class="minimal-stat-label">Facturaciñn</div>
                     <div class="minimal-stat-value" id="statFacturacion">0,00 €</div>
                     <div class="minimal-stat-detail">Mensual</div>
                 </div>
@@ -2292,7 +2373,7 @@
         }
 
         <div class="card">
-            <h2 class="card-title">ï Parámetros</h2>
+            <h2 class="card-title">šï Parámetros</h2>
             <div class="control-row">
                 <div class="control-group">
                     <label>Mes Actual</label>
@@ -2327,16 +2408,16 @@
             <!-- Botón Principal de Cambios Mensuales -->
             <div class="monthly-changes-container" style="margin-bottom: 20px;">
                 <button id="btnCambiosMes" class="btn-primary-large" onclick="toggleDropdownMenu()">
-                    Cambios del mes <span style="font-size: 12px;">▼</span>
+                    ðŸ“ Cambios del mes <span style="font-size: 12px;">–</span>
                 </button>
                 
                 <div id="dropdownMenu" class="dropdown-menu hidden">
                     <div class="dropdown-item" data-action="alta" onclick="openModalAlta()">
-                        <span class="dropdown-icon" style="color: #4CAF50;">+</span>
+                        <span class="dropdown-icon" style="color: #4CAF50;"></span>
                         <span>Alta de Panel Nuevo</span>
                     </div>
                     <div class="dropdown-item" data-action="reinstalacion" onclick="openModalReinstalacion()">
-                        <span class="dropdown-icon" style="color: #2196F3;">↻</span>
+                        <span class="dropdown-icon" style="color: #2196F3;">ðŸ”</span>
                         <span>Reinstalación de Panel</span>
                     </div>
                     <div class="dropdown-item" data-action="baja" onclick="openModalBaja()">
@@ -2355,11 +2436,11 @@
             </div>
             
             <div class="actions-grid">
-                <button onclick="exportData()" class="btn-primary">Exportar a Excel</button>
-                <button onclick="viewHistory()" class="btn-secondary">Ver histórico mensual</button>
-                <button onclick="viewMonthlyChanges()" class="btn-secondary">Ver cambios del mes</button>
-                <button onclick="exportHistory()" class="btn-secondary">Exportar histórico completo</button>
-                <button onclick="backupComplete()" class="btn-secondary">Copia de seguridad (JSON)</button>
+                <button onclick="exportData()" class="btn-primary"> Exportar a Excel</button>
+                <button onclick="viewHistory()" class="btn-secondary"> Ver histórico mensual</button>
+                <button onclick="viewMonthlyChanges()" class="btn-secondary">ðŸ“ Ver cambios del mes</button>
+                <button onclick="exportHistory()" class="btn-secondary"> Exportar histórico completo</button>
+                <button onclick="backupComplete()" class="btn-secondary">ðŸ’ Copia de seguridad (JSON)</button>
             </div>
         </div>
 
@@ -2391,7 +2472,7 @@
                     </div>
                     
                     <div class="billing-preview" id="altaBillingPreview">
-                        <h3> Vista Previa de Facturación</h3>
+                        <h3> Vista Previa de Facturaciñn</h3>
                         <div class="billing-row">
                             <span class="billing-label">Tarifa mensual base:</span>
                             <span class="billing-value">37,70 €</span>
@@ -2422,7 +2503,7 @@
         <div id="modalReinstalacion" class="modal-overlay hidden">
             <div class="modal-content modal-reinstalacion">
                 <div class="modal-header">
-                    <h2><span></span> reinstalación de Panel</h2>
+                    <h2><span>ðŸ”</span> reinstalación de Panel</h2>
                     <button class="modal-close" onclick="closeModal('modalReinstalacion')">&times;</button>
                 </div>
                 <div class="modal-body">
@@ -2453,13 +2534,13 @@
                     </div>
 
                     <div class="billing-preview" id="reinstalacionBillingPreview">
-                        <h3> Comparación de Facturación</h3>
+                        <h3>ðŸ’ Comparación de Facturaciñn</h3>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación sin reinstalación:</span>
+                            <span class="billing-label">Facturaciñn sin reinstalación:</span>
                             <span class="billing-value" id="reinstalacionSin">-</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación con reinstalación:</span>
+                            <span class="billing-label">Facturaciñn con reinstalación:</span>
                             <span class="billing-value" id="reinstalacionCon">-</span>
                         </div>
                         <div class="billing-row">
@@ -2480,7 +2561,7 @@
         <div id="modalBaja" class="modal-overlay hidden">
             <div class="modal-content modal-baja">
                 <div class="modal-header">
-                    <h2><span></span> Baja Definitiva de Panel</h2>
+                    <h2><span>ðŸ”</span> Baja Definitiva de Panel</h2>
                     <button class="modal-close" onclick="closeModal('modalBaja')">&times;</button>
                 </div>
                 <div class="modal-body">
@@ -2510,7 +2591,7 @@
                     <div class="warning-box">
                         <div class="warning-box-icon"></div>
                         <div class="warning-box-text">
-                            <strong>Atenciñn:</strong> Esta acciñn es definitiva. El panel dejará de facturarse desde este mes en adelante. La Facturación de meses anteriores se conserva.
+                            <strong>Atenciñn:</strong> Esta acciñn es definitiva. El panel dejará de facturarse desde este mes en adelante. La facturaciñn de meses anteriores se conserva.
                         </div>
                     </div>
 
@@ -2520,13 +2601,13 @@
                     </div>
 
                     <div class="billing-preview" id="bajaBillingPreview">
-                        <h3> Impacto en Facturación</h3>
+                        <h3>ðŸ’ Impacto en Facturaciñn</h3>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación mensual actual:</span>
+                            <span class="billing-label">Facturaciñn mensual actual:</span>
                             <span class="billing-value" id="bajaFacturacionActual">-</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación despuñs de baja:</span>
+                            <span class="billing-label">Facturaciñn despuñs de baja:</span>
                             <span class="billing-value">0,00 €</span>
                         </div>
                         <div class="billing-row">
@@ -2579,9 +2660,9 @@
                     </div>
 
                     <div class="billing-preview" id="desmontajeBillingPreview">
-                        <h3> Ajuste de Facturación</h3>
+                        <h3>ðŸ’ Ajuste de Facturaciñn</h3>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación mes completo:</span>
+                            <span class="billing-label">Facturaciñn mes completo:</span>
                             <span class="billing-value">37,70 €</span>
                         </div>
                         <div class="billing-row">
@@ -2589,7 +2670,7 @@
                             <span class="billing-value" id="desmontajeDias">-</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación ajustada:</span>
+                            <span class="billing-label">Facturaciñn ajustada:</span>
                             <span class="billing-value" id="desmontagTotal">-</span>
                         </div>
                         <div class="billing-row">
@@ -2648,7 +2729,7 @@
                     </div>
 
                     <div class="billing-preview" id="tarifaBillingPreview">
-                        <h3> Impacto del Cambio</h3>
+                        <h3>ðŸ’ Impacto del Cambio</h3>
                         <div class="billing-row">
                             <span class="billing-label">Tarifa actual:</span>
                             <span class="billing-value" id="tarifaActual">-</span>
@@ -2681,7 +2762,7 @@
                 <div class="value" id="totalPanels">0</div>
             </div>
             <div class="stat-card">
-                <h3>Facturación Mensual</h3>
+                <h3>Facturaciñn Mensual</h3>
                 <div class="value" id="totalRevenue">0,00 €</div>
             </div>
             <div class="stat-card">
@@ -2712,7 +2793,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <span class="close-modal" onclick="closeModal('addPanelModal')">&times;</span>
-                <h2>• Añadir Nuevo Panel</h2>
+                <h2>ž• Añadir Nuevo Panel</h2>
             </div>
             <div class="control-group">
                 <label>Municipio</label>
@@ -2737,7 +2818,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <span class="close-modal" onclick="closeModal('removePanelModal')">&times;</span>
-                <h2>– Eliminar Panel</h2>
+                <h2>ž– Eliminar Panel</h2>
             </div>
             <div class="control-group">
                 <label>Código Parada</label>
@@ -2754,7 +2835,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <span class="close-modal" onclick="closeModal('dismountPanelModal')">&times;</span>
-                <h2> Desmontar Panel</h2>
+                <h2>ðŸ“ Desmontar Panel</h2>
             </div>
             <div class="control-group">
                 <label>Código Parada</label>
@@ -2793,7 +2874,7 @@
         let firestoreLoaded = false;
 
         // ============================================
-        // FUNCIONES PARA PESTAñAS VESTACP
+        // FUNCIONES PARA PESTAñ‘AS VESTACP
         // ============================================
         function cambiarTab(event, tabName) {
             event.preventDefault();
@@ -2830,7 +2911,7 @@
         }
 
         // ============================================
-        // ACTUALIZAR BADGES EN PESTAñAS
+        // ACTUALIZAR BADGES EN PESTAñ‘AS
         // ============================================
         function actualizarBadges() {
             const totalPaneles = panelsData.length;
@@ -2875,7 +2956,7 @@
 
             // Actualizar stats
             document.getElementById('statActivos').textContent = activos;
-            // En UI el segundo contador muestra Pausados
+            // En UI el segundo contador muestra “Pausados”
             const elPausados = document.getElementById('statDesmontados');
             if (elPausados) elPausados.textContent = pausados;
 
@@ -2890,7 +2971,7 @@
         // Cargar datos iniciales SOLO desde Firestore
         // Esta función se llama automáticamente después de autenticación exitosa
         async function loadInitialData() {
-            console.log(' Cargando paneles desde Firestore...');
+            console.log('” Cargando paneles desde Firestore...');
             
             try {
                 if (!window.cargarPanelesDesdeFirestore) {
@@ -2902,15 +2983,15 @@
                 if (panelesFirestore.length > 0) {
                     panelsData = panelesFirestore;
                     firestoreLoaded = true;
-                    console.log(`… ${panelesFirestore.length} paneles cargados desde Firestore`);
+                    console.log(`œ… ${panelesFirestore.length} paneles cargados desde Firestore`);
                 } else {
                     panelsData = [];
-                    console.warn('ï No se encontraron paneles en Firestore');
-                    alert(' No hay paneles en la base de datos.\n\nUsa el botón "Cambios del mes  Alta" para añadir paneles.');
+                    console.warn('šï No se encontraron paneles en Firestore');
+                    alert('ðŸ“ No hay paneles en la base de datos.\n\nUsa el botón "Cambios del mes ’ Alta" para añadir paneles.');
                 }
             } catch (error) {
-                console.error(' Error al cargar desde Firestore:', error);
-                alert(' Error al conectar con Firestore:\n\n' + error.message + '\n\nRecarga la página.');
+                console.error('Œ Error al cargar desde Firestore:', error);
+                alert('Œ Error al conectar con Firestore:\n\n' + error.message + '\n\nRecarga la página.');
                 panelsData = [];
             }
             
@@ -2970,7 +3051,7 @@
             localStorage.setItem(HISTORY_KEY, JSON.stringify(monthlyHistory));
         }
 
-        // FUNCIñN CORE: Calcular Facturación de un panel para un mes específico
+        // FUNCIñN CORE: Calcular facturaciñn de un panel para un mes específico
         function calcularFacturacion(panel, mes, year) {
             // Tolerar tarifas como string "37,70" o "37.70" y valores faltantes
             const rawTarifa = (panel && panel.tarifa) != null ? panel.tarifa : 37.70;
@@ -3055,7 +3136,7 @@
             return new Date(year, month, 0).getDate();
         }
 
-        // Calcular Facturación (funciñn legacy - se mantiene por compatibilidad)
+        // Calcular facturaciñn (funciñn legacy - se mantiene por compatibilidad)
         function calculateBilling(days) {
             const baseRate = parseFloat(document.getElementById('baseRate').value);
             const dailyRate = baseRate / 30;
@@ -3125,7 +3206,7 @@
                                 <span class="minimal-list-item-stat-value">${days}</span>
                             </div>
                             <div class="minimal-list-item-stat">
-                                <span class="minimal-list-item-stat-label">Facturación</span>
+                                <span class="minimal-list-item-stat-label">Facturaciñn</span>
                                 <span class="minimal-list-item-stat-value">${billing} €</span>
                             </div>
                         </div>
@@ -3133,7 +3214,7 @@
                     <div class="minimal-list-item-actions">
                         <span class="minimal-list-item-badge ${estadoClass}">${estadoBadge}</span>
                         <button class="minimal-action-btn delete" onclick="deletePanel(${index})" title="Eliminar">
-                            <span>—ï</span>
+                            <span>ðŸ—‘ï</span>
                         </button>
                     </div>
                 `;
@@ -3293,7 +3374,7 @@
                 html += '<thead><tr style="background: var(--bg); color: white;">';
                 html += '<th style="padding: 10px; text-align: left;">Mes/Año</th>';
                 html += '<th style="padding: 10px; text-align: center;">Paneles</th>';
-                html += '<th style="padding: 10px; text-align: right;">Facturación</th>';
+                html += '<th style="padding: 10px; text-align: right;">Facturaciñn</th>';
                 html += '<th style="padding: 10px; text-align: center;">Fecha Guardado</th>';
                 html += '</tr></thead><tbody>';
                 
@@ -3328,7 +3409,7 @@
         // Ver cambios del mes registrados
         function viewMonthlyChanges() {
             if (Object.keys(monthlyChanges).length === 0) {
-                alert(' No hay cambios mensuales registrados.\n\nLos cambios se registran automáticamente cuando procesas el archivo de cambios mensuales.');
+                alert('ðŸ“ No hay cambios mensuales registrados.\n\nLos cambios se registran automáticamente cuando procesas el archivo de cambios mensuales.');
                 return;
             }
             
@@ -3491,7 +3572,7 @@
                 return;
             }
             
-            let csv = 'Mes,Año,Total Paneles,Facturación Total,Fecha Guardado\n';
+            let csv = 'Mes,Año,Total Paneles,Facturaciñn Total,Fecha Guardado\n';
             
             const sortedKeys = Object.keys(monthlyHistory).sort();
             sortedKeys.forEach(key => {
@@ -3675,7 +3756,7 @@
 
             // Validaciones
             if (!municipio) {
-                alert('ï Por favor selecciona un municipio');
+                alert('šï Por favor selecciona un municipio');
                 return;
             }
             if (!codigo) {
@@ -3683,7 +3764,7 @@
                 return;
             }
             if (!fecha) {
-                alert('ï Por favor selecciona una fecha de instalación');
+                alert('šï Por favor selecciona una fecha de instalación');
                 return;
             }
 
@@ -3748,7 +3829,7 @@
         }
 
         // ====================
-        // MODAL: REINSTALACIñN
+        // MODAL: REINSTALACIñ“N
         // ====================
 
         let panelSeleccionadoReinstalacion = null;
@@ -3838,7 +3919,7 @@
 
         async function guardarReinstalacion() {
             if (!panelSeleccionadoReinstalacion) {
-                alert('ï Por favor selecciona un panel');
+                alert('šï Por favor selecciona un panel');
                 return;
             }
 
@@ -3847,12 +3928,12 @@
             const nuevoMunicipio = cambioMunicipio ? document.getElementById('reinstalacionNuevoMunicipio').value : null;
 
             if (!fecha) {
-                alert('ï Por favor selecciona una fecha de reinstalación');
+                alert('šï Por favor selecciona una fecha de reinstalación');
                 return;
             }
 
             if (cambioMunicipio && !nuevoMunicipio) {
-                alert('ï Por favor selecciona el nuevo municipio');
+                alert('šï Por favor selecciona el nuevo municipio');
                 return;
             }
 
@@ -3937,7 +4018,7 @@
 
         async function guardarBaja() {
             if (!panelSeleccionadoBaja) {
-                alert('ï Por favor selecciona un panel');
+                alert('šï Por favor selecciona un panel');
                 return;
             }
 
@@ -3945,12 +4026,12 @@
             const confirmacion = document.getElementById('bajaConfirmacion').checked;
 
             if (!motivo) {
-                alert('ï Por favor selecciona el motivo de la baja');
+                alert('šï Por favor selecciona el motivo de la baja');
                 return;
             }
 
             if (!confirmacion) {
-                alert('ï Debes confirmar la baja definitiva del panel');
+                alert('šï Debes confirmar la baja definitiva del panel');
                 return;
             }
 
@@ -4057,7 +4138,7 @@
 
         async function guardarDesmontaje() {
             if (!panelSeleccionadoDesmontaje) {
-                alert('ï Por favor selecciona un panel');
+                alert('šï Por favor selecciona un panel');
                 return;
             }
 
@@ -4065,12 +4146,12 @@
             const motivo = document.getElementById('desmontagMotivo').value;
 
             if (!fecha) {
-                alert('ï Por favor selecciona una fecha de desmontaje');
+                alert('šï Por favor selecciona una fecha de desmontaje');
                 return;
             }
 
             if (!motivo) {
-                alert('ï Por favor selecciona el motivo del desmontaje');
+                alert('šï Por favor selecciona el motivo del desmontaje');
                 return;
             }
 
@@ -4188,7 +4269,7 @@
 
         async function guardarCambioTarifa() {
             if (!panelSeleccionadoTarifa) {
-                alert('ï Por favor selecciona un panel');
+                alert('šï Por favor selecciona un panel');
                 return;
             }
 
@@ -4196,12 +4277,12 @@
             const alcance = document.querySelector('input[name="tarifaAlcance"]:checked')?.value;
 
             if (!nuevaTarifa || isNaN(nuevaTarifa) || nuevaTarifa <= 0) {
-                alert('ï Por favor ingresa una tarifa válida');
+                alert('šï Por favor ingresa una tarifa válida');
                 return;
             }
 
             if (!alcance) {
-                alert('ï Por favor selecciona el alcance del cambio');
+                alert('šï Por favor selecciona el alcance del cambio');
                 return;
             }
 
@@ -4329,7 +4410,7 @@
     </script>
 
         <!-- ============================================
-             BOTñN FLOTANTE MINIMALISTA
+             BOTñ“N FLOTANTE MINIMALISTA
              ============================================ -->
         <button class="minimal-fab" onclick="toggleDropdownMenu()" title="añadir nuevo cambio">
             +
