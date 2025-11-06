@@ -8,6 +8,9 @@
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- SheetJS para exportar Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
     <!-- Google Fonts - Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -191,6 +194,9 @@
     
     <!-- Script de autenticación (NO module para onclick) -->
     <script src="auth.js"></script>
+    
+    <!-- Billing Service - Sistema de Facturación -->
+    <script src="billingService.js"></script>
     
     <style>
         /* ============================================
@@ -1489,6 +1495,215 @@
         /* ============================================
            RESPONSIVE DESIGN MINIMALISTA
            ============================================ */
+        
+        /* Estilos para barra de filtros responsive */
+        .filters-bar {
+            background: var(--gray-lighter);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            align-items: center;
+        }
+
+        .filter-select,
+        .filter-input {
+            padding: 8px 12px;
+            border: 1px solid var(--gray-light);
+            border-radius: 6px;
+            background: white;
+            font-size: 14px;
+            color: var(--text);
+            transition: border-color 0.2s ease;
+        }
+
+        .filter-select:focus,
+        .filter-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1);
+        }
+
+        .filters-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .btn-clear-filters {
+            background: var(--gray-dark);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .btn-clear-filters:hover {
+            background: var(--gray-darker);
+        }
+
+        .results-counter {
+            text-align: center;
+            font-size: 13px;
+            color: var(--muted);
+            font-weight: 500;
+        }
+
+        /* Responsive design para filtros */
+        @media (max-width: 1024px) {
+            .filters-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .filters-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .filters-bar {
+                padding: 12px;
+            }
+            
+            .filters-actions {
+                justify-content: center;
+            }
+        }
+
+        /* ===== ESTILOS PANEL PICKER ===== */
+        
+        .panel-picker {
+            position: relative;
+            width: 100%;
+        }
+
+        .panel-picker-input-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .panel-picker-input {
+            width: 100%;
+            padding: 10px 40px 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            color: var(--text);
+            transition: all 0.2s ease;
+        }
+
+        .panel-picker-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1);
+        }
+
+        .panel-picker-clear {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            font-size: 18px;
+            color: var(--muted);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: color 0.2s ease;
+        }
+
+        .panel-picker-clear:hover {
+            color: var(--text);
+            background: var(--gray-lighter);
+        }
+
+        .panel-picker-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .panel-picker-loading,
+        .panel-picker-no-results {
+            padding: 12px 16px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .panel-picker-option {
+            padding: 10px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--gray-lighter);
+            transition: background-color 0.2s ease;
+        }
+
+        .panel-picker-option:last-child {
+            border-bottom: none;
+        }
+
+        .panel-picker-option:hover,
+        .panel-picker-option.highlighted {
+            background: var(--gray-lighter);
+        }
+
+        .panel-picker-selected {
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: var(--gray-lighter);
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .panel-picker-selected small {
+            color: var(--muted);
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .panel-picker-selected-info {
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        @media (max-width: 640px) {
+            .panel-picker-dropdown {
+                max-height: 150px;
+            }
+        }
+
+        /* ===== FIN ESTILOS PANEL PICKER ===== */
+
+        /* Lista de paneles */
+
+        .results-count {
+            font-size: 12px;
+            color: var(--gray);
+            font-weight: 500;
+        }
+
         @media (max-width: 1024px) {
             .minimal-stats {
                 grid-template-columns: repeat(2, 1fr);
@@ -1622,6 +1837,19 @@
             grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
             gap: 16px;
             margin-bottom: 24px;
+        }
+
+        /* ============================================
+           GRID PARA PARÁMETROS Y ACCIONES
+           ============================================ */
+        .params-actions-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 16px;
+            align-items: start;
+            padding: 0;
+            max-width: 100%;
+            margin-bottom: var(--space-xl);
         }
 
         /* Estilos para botón principal de Cambios del mes */
@@ -2206,6 +2434,11 @@
                 width: 100%;
                 justify-content: space-between;
             }
+            
+            /* Responsive para el grid de parámetros/acciones */
+            .params-actions-grid {
+                grid-template-columns: 1fr !important;
+            }
         }
     </style>
 </head>
@@ -2285,14 +2518,10 @@
                 </div>
             </div>
 
-        <div class="container" style="padding: 0; max-width: 100%; display: grid; grid-template-columns: 1fr 1.2fr; gap: 16px; align-items: start;">
-
-        @media (max-width: 768px) {
-            .container { grid-template-columns: 1fr !important; }
-        }
+        <div class="params-actions-grid">
 
         <div class="card">
-            <h2 class="card-title">ï Parámetros</h2>
+            <h2 class="card-title">🎚️ Parámetros</h2>
             <div class="control-row">
                 <div class="control-group">
                     <label>Mes Actual</label>
@@ -2363,6 +2592,8 @@
             </div>
         </div>
 
+        </div> <!-- Fin params-actions-grid -->
+
         <!-- Modal: Alta de Panel Nuevo -->
         <div id="modalAlta" class="modal-overlay hidden">
             <div class="modal-content modal-alta">
@@ -2393,20 +2624,20 @@
                     <div class="billing-preview" id="altaBillingPreview">
                         <h3> Vista Previa de Facturación</h3>
                         <div class="billing-row">
-                            <span class="billing-label">Tarifa mensual base:</span>
+                            <span class="billing-label">Facturación mes completo:</span>
                             <span class="billing-value">37,70 €</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Días a facturar:</span>
+                            <span class="billing-label">Días facturables:</span>
                             <span class="billing-value" id="altaDias">-</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Tarifa diaria (37,70/30):</span>
-                            <span class="billing-value">1,26 €/día</span>
+                            <span class="billing-label">Importe a facturar:</span>
+                            <span class="billing-value" id="altaTotal">-</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Total a facturar:</span>
-                            <span class="billing-value" id="altaTotal">-</span>
+                            <span class="billing-label">Importe no facturado:</span>
+                            <span class="billing-value" id="altaNoFacturado" style="color: #999;">-</span>
                         </div>
                     </div>
 
@@ -2426,10 +2657,9 @@
                     <button class="modal-close" onclick="closeModal('modalReinstalacion')">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group smart-search">
-                        <label for="reinstalacionBuscar">Buscar Panel *</label>
-                        <input type="text" id="reinstalacionBuscar" placeholder="Buscar por Código o municipio..." oninput="buscarPanel('reinstalacion')">
-                        <div id="reinstalacionResults" class="search-results"></div>
+                    <div class="form-group">
+                        <label>Buscar Panel *</label>
+                        <div id="reinstalacionPanelPicker"></div>
                     </div>
                     <div class="form-group">
                         <label>Panel Seleccionado</label>
@@ -2455,11 +2685,11 @@
                     <div class="billing-preview" id="reinstalacionBillingPreview">
                         <h3> Comparación de Facturación</h3>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación sin reinstalación:</span>
+                            <span class="billing-label">Importe sin reinstalación:</span>
                             <span class="billing-value" id="reinstalacionSin">-</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación con reinstalación:</span>
+                            <span class="billing-label">Importe con reinstalación:</span>
                             <span class="billing-value" id="reinstalacionCon">-</span>
                         </div>
                         <div class="billing-row">
@@ -2484,10 +2714,9 @@
                     <button class="modal-close" onclick="closeModal('modalBaja')">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group smart-search">
-                        <label for="bajaBuscar">Buscar Panel *</label>
-                        <input type="text" id="bajaBuscar" placeholder="Buscar por Código o municipio..." oninput="buscarPanel('baja')">
-                        <div id="bajaResults" class="search-results"></div>
+                    <div class="form-group">
+                        <label>Buscar Panel *</label>
+                        <div id="bajaPanelPicker"></div>
                     </div>
                     <div class="form-group">
                         <label>Panel Seleccionado</label>
@@ -2522,15 +2751,15 @@
                     <div class="billing-preview" id="bajaBillingPreview">
                         <h3> Impacto en Facturación</h3>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación mensual actual:</span>
+                            <span class="billing-label">Importe mensual actual:</span>
                             <span class="billing-value" id="bajaFacturacionActual">-</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación despuñs de baja:</span>
+                            <span class="billing-label">Importe después de baja:</span>
                             <span class="billing-value">0,00 €</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Pñrdida mensual:</span>
+                            <span class="billing-label">Pérdida mensual:</span>
                             <span class="billing-value" id="bajaPerdida" style="color: #DC2626;">-</span>
                         </div>
                     </div>
@@ -2551,10 +2780,9 @@
                     <button class="modal-close" onclick="closeModal('modalDesmontaje')">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group smart-search">
-                        <label for="desmontajeBuscar">Buscar Panel *</label>
-                        <input type="text" id="desmontajeBuscar" placeholder="Buscar por Código o municipio..." oninput="buscarPanel('desmontaje')">
-                        <div id="desmontagResults" class="search-results"></div>
+                    <div class="form-group">
+                        <label>Buscar Panel *</label>
+                        <div id="desmontajePanelPicker"></div>
                     </div>
                     <div class="form-group">
                         <label>Panel Seleccionado</label>
@@ -2585,16 +2813,16 @@
                             <span class="billing-value">37,70 €</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Días activos en el mes:</span>
+                            <span class="billing-label">Días facturables:</span>
                             <span class="billing-value" id="desmontajeDias">-</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Facturación ajustada:</span>
+                            <span class="billing-label">Importe a facturar:</span>
                             <span class="billing-value" id="desmontagTotal">-</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Ahorro por desmontaje:</span>
-                            <span class="billing-value" id="desmontagAhorro" style="color: #DC2626;">-</span>
+                            <span class="billing-label">Importe no facturado:</span>
+                            <span class="billing-value" id="desmontagAhorro" style="color: #999;">-</span>
                         </div>
                     </div>
 
@@ -2614,10 +2842,9 @@
                     <button class="modal-close" onclick="closeModal('modalCambioTarifa')">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group smart-search">
-                        <label for="tarifaBuscar">Buscar Panel *</label>
-                        <input type="text" id="tarifaBuscar" placeholder="Buscar por Código o municipio..." oninput="buscarPanel('tarifa')">
-                        <div id="tarifaResults" class="search-results"></div>
+                    <div class="form-group">
+                        <label>Buscar Panel *</label>
+                        <div id="tarifaPanelPicker"></div>
                     </div>
                     <div class="form-group">
                         <label>Panel Seleccionado</label>
@@ -2650,11 +2877,11 @@
                     <div class="billing-preview" id="tarifaBillingPreview">
                         <h3> Impacto del Cambio</h3>
                         <div class="billing-row">
-                            <span class="billing-label">Tarifa actual:</span>
+                            <span class="billing-label">Importe actual:</span>
                             <span class="billing-value" id="tarifaActual">-</span>
                         </div>
                         <div class="billing-row">
-                            <span class="billing-label">Nueva tarifa:</span>
+                            <span class="billing-label">Nuevo importe:</span>
                             <span class="billing-value" id="tarifaNuevaPreview">-</span>
                         </div>
                         <div class="billing-row">
@@ -2675,32 +2902,44 @@
             </div>
         </div>
 
-        <div class="stats">
-            <div class="stat-card">
-                <h3>Total Paneles</h3>
-                <div class="value" id="totalPanels">0</div>
-            </div>
-            <div class="stat-card">
-                <h3>Facturación Mensual</h3>
-                <div class="value" id="totalRevenue">0,00 €</div>
-            </div>
-            <div class="stat-card">
-                <h3>Municipios</h3>
-                <div class="value" id="totalMunicipios">0</div>
-            </div>
-            <div class="stat-card">
-                <h3>Paneles Parciales</h3>
-                <div class="value" id="partialPanels">0</div>
-            </div>
-        </div>
-
         <div class="minimal-panels-section">
             <div class="minimal-section-header">
                 <h2 class="minimal-section-title">Paneles</h2>
-                <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Buscar por municipio o Código..." onkeyup="filterTable()">
+            </div>
+            
+            <!-- Barra de filtros responsive -->
+            <div class="filters-bar">
+                <div class="filters-grid">
+                    <select id="filterMunicipio" class="filter-select">
+                        <option value="">Todos los municipios</option>
+                    </select>
+                    
+                    <select id="filterEstado" class="filter-select">
+                        <option value="">Todos los estados</option>
+                        <option value="activo">Activo</option>
+                        <option value="pausado">Pausado</option>
+                        <option value="desmontado">Desmontado</option>
+                    </select>
+                    
+                    <select id="filterFacturacion" class="filter-select">
+                        <option value="">Todas las facturaciones</option>
+                        <option value="completa">Completa (30 días)</option>
+                        <option value="parcial">Parcial (< 30 días)</option>
+                        <option value="sin_facturar">Sin facturar (0 días)</option>
+                    </select>
+                    
+                    <input type="text" id="searchInput" class="filter-input" placeholder="Código o municipio...">
+                </div>
+                
+                <div class="filters-actions">
+                    <button id="clearFiltersBtn" class="btn-clear-filters">Limpiar filtros</button>
+                </div>
+                
+                <div class="results-counter">
+                    <span id="resultsCount">0 paneles</span>
                 </div>
             </div>
+            
             <div class="minimal-list" id="panelsList">
                 <!-- Los paneles se cargarán aquí dinámicamente -->
             </div>
@@ -2862,6 +3101,8 @@
             let pausados = 0;     // 0 < días < 30
             let facturacionTotal = 0;
 
+            console.log('🔢 Calculando estadísticas para', panelsData.length, 'paneles');
+
             panelsData.forEach(panel => {
                 const fact = calcularFacturacion(panel, mes, year);
                 const dias = Number(fact.dias) || 0;
@@ -2873,24 +3114,29 @@
                 facturacionTotal += importe;
             });
 
-            // Actualizar stats
-            document.getElementById('statActivos').textContent = activos;
-            // En UI el segundo contador muestra Pausados
-            const elPausados = document.getElementById('statDesmontados');
-            if (elPausados) elPausados.textContent = pausados;
+            console.log('📊 Resultados:', { activos, pausados, facturacionTotal, total: panelsData.length });
 
-            const fmtEUR = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
-            document.getElementById('statFacturacion').textContent = fmtEUR.format(facturacionTotal);
+            // Actualizar stats - VERSIÓN SEGURA
+            const statTotalEl = document.getElementById('statTotal');
+            const statActivosEl = document.getElementById('statActivos');
+            const statPausadosEl = document.getElementById('statDesmontados');
+            const statFacturacionEl = document.getElementById('statFacturacion');
+            
+            if (statTotalEl) statTotalEl.textContent = panelsData.length;
+            if (statActivosEl) statActivosEl.textContent = activos;
+            if (statPausadosEl) statPausadosEl.textContent = pausados;
+            
+            if (statFacturacionEl) statFacturacionEl.textContent = formatEuro(facturacionTotal);
+            
             const totalRevenueEl = document.getElementById('totalRevenue');
-            if (totalRevenueEl) totalRevenueEl.textContent = fmtEUR.format(facturacionTotal);
-            document.getElementById('statTotal').textContent = panelsData.length;
+            if (totalRevenueEl) totalRevenueEl.textContent = formatEuro(facturacionTotal);
         }
 
 
         // Cargar datos iniciales SOLO desde Firestore
         // Esta función se llama automáticamente después de autenticación exitosa
         async function loadInitialData() {
-            console.log(' Cargando paneles desde Firestore...');
+            console.log('🔄 Cargando paneles desde Firestore...');
             
             try {
                 if (!window.cargarPanelesDesdeFirestore) {
@@ -2902,15 +3148,35 @@
                 if (panelesFirestore.length > 0) {
                     panelsData = panelesFirestore;
                     firestoreLoaded = true;
-                    console.log(`… ${panelesFirestore.length} paneles cargados desde Firestore`);
+                    console.log(`✅ ${panelesFirestore.length} paneles cargados desde Firestore`);
                 } else {
-                    panelsData = [];
-                    console.warn('ï No se encontraron paneles en Firestore');
-                    alert(' No hay paneles en la base de datos.\n\nUsa el botón "Cambios del mes  Alta" para añadir paneles.');
+                    console.warn('⚠️ No se encontraron paneles en Firestore, intentando cargar desde JSON...');
+                    
+                    // Fallback: cargar desde archivo JSON local
+                    try {
+                        const response = await fetch('./paneles_octubre_2025.json');
+                        const panelesJSON = await response.json();
+                        
+                        if (panelesJSON && panelesJSON.length > 0) {
+                            panelsData = panelesJSON.map(panel => ({
+                                ...panel,
+                                tarifa: panel.tarifa || 37.70,
+                                estado: panel.fechaDesmontaje ? 'desmontado' : 'activo'
+                            }));
+                            console.log(`✅ ${panelsData.length} paneles cargados desde JSON`);
+                        } else {
+                            panelsData = [];
+                            console.warn('⚠️ No hay datos en el archivo JSON');
+                        }
+                    } catch (jsonError) {
+                        console.error('❌ Error al cargar JSON:', jsonError);
+                        panelsData = [];
+                        alert('⚠️ No se pudieron cargar los datos.\n\nIntenta recargar la página.');
+                    }
                 }
             } catch (error) {
-                console.error(' Error al cargar desde Firestore:', error);
-                alert(' Error al conectar con Firestore:\n\n' + error.message + '\n\nRecarga la página.');
+                console.error('❌ Error al cargar desde Firestore:', error);
+                alert('❌ Error al conectar con Firestore:\n\n' + error.message + '\n\nRecarga la página.');
                 panelsData = [];
             }
             
@@ -2931,10 +3197,97 @@
             }
             
             updateTable();
+            
+            // Forzar actualización de estadísticas después de cargar datos
+            actualizarEstadisticas();
+            
+            console.log('✅ Datos cargados y estadísticas actualizadas');
+            
+            // DEBUG: Verificar elementos DOM
+            console.log('🔍 Verificando elementos DOM:');
+            console.log('statTotal:', document.getElementById('statTotal'));
+            console.log('statActivos:', document.getElementById('statActivos'));
+            console.log('statDesmontados:', document.getElementById('statDesmontados'));
+            console.log('statFacturacion:', document.getElementById('statFacturacion'));
+            
+            // Forzar actualización manual como último recurso
+            setTimeout(() => {
+                console.log('⏰ Ejecutando actualización diferida...');
+                actualizarEstadisticas();
+                
+                // Actualización manual directa
+                const totalEl = document.getElementById('statTotal');
+                if (totalEl && panelsData.length > 0) {
+                    totalEl.textContent = panelsData.length;
+                    console.log('🔧 Actualización manual aplicada:', panelsData.length);
+                }
+            }, 1000);
+            
+            // Poblar filtros después de cargar datos
+            populateFilters();
         }
         
         // Exponer función globalmente para que Firebase Auth pueda llamarla
         window.loadInitialData = loadInitialData;
+
+        // Función de debugging global
+        window.debugStats = function() {
+            console.log('🐛 DEBUG STATS:');
+            console.log('panelsData.length:', panelsData.length);
+            console.log('panelsData sample:', panelsData.slice(0, 3));
+            
+            const mes = parseInt(document.getElementById('currentMonth').value);
+            const year = parseInt(document.getElementById('currentYear').value);
+            console.log('Mes/Año actual:', mes, year);
+            
+            // Test cálculo manual
+            if (panelsData.length > 0) {
+                const testPanel = panelsData[0];
+                const testCalc = calcularFacturacion(testPanel, mes, year);
+                console.log('Test cálculo primer panel:', testCalc);
+            }
+            
+            // Ejecutar actualización manual
+            actualizarEstadisticas();
+            
+            // Forzar valores manualmente
+            document.getElementById('statTotal').textContent = panelsData.length;
+            document.getElementById('statActivos').textContent = panelsData.filter(p => !p.fechaDesmontaje).length;
+            document.getElementById('statDesmontados').textContent = panelsData.filter(p => p.fechaDesmontaje).length;
+            document.getElementById('statFacturacion').textContent = formatEuro(panelsData.length * 37.70);
+            
+            console.log('🔧 Valores forzados manualmente');
+        };
+
+        // Función de debugging para filtros
+        window.debugFilters = function() {
+            console.log('🔧 DEBUG FILTERS:');
+            console.log('panelsData existe:', !!panelsData);
+            console.log('panelsData.length:', panelsData ? panelsData.length : 'undefined');
+            console.log('sample panelsData:', panelsData ? panelsData.slice(0, 3) : 'undefined');
+            
+            const filterMunicipio = document.getElementById('filterMunicipio');
+            console.log('filterMunicipio elemento:', !!filterMunicipio);
+            console.log('filterMunicipio opciones:', filterMunicipio ? filterMunicipio.options.length : 'elemento no encontrado');
+            
+            if (panelsData && panelsData.length > 0) {
+                const municipios = [...new Set(panelsData.map(p => p.municipio))].filter(m => m).sort();
+                console.log('Municipios únicos extraídos:', municipios);
+                populateFilters();
+            }
+        };
+        
+        // Auto-ejecutar al cargar
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                console.log('🚀 Auto-ejecutando debugStats después de 3 segundos...');
+                if (window.debugStats) window.debugStats();
+                
+                // También ejecutar debugFilters
+                console.log('🔧 Auto-ejecutando debugFilters...');
+                if (window.debugFilters) window.debugFilters();
+            }, 3000);
+        });
 
 
         // Guardar histórico en localStorage (NO paneles, solo históricos)
@@ -2970,7 +3323,7 @@
             localStorage.setItem(HISTORY_KEY, JSON.stringify(monthlyHistory));
         }
 
-        // FUNCIñN CORE: Calcular Facturación de un panel para un mes específico
+        // FUNCIÓN CORE: Calcular Facturación de un panel para un mes específico
         function calcularFacturacion(panel, mes, year) {
             // Tolerar tarifas como string "37,70" o "37.70" y valores faltantes
             const rawTarifa = (panel && panel.tarifa) != null ? panel.tarifa : 37.70;
@@ -2987,12 +3340,12 @@
             let tipo = 'completo';
 
             // Detectar fecha de instalación
-            if (panel.fechaInstalacion) {
+            if (panel.fechaInstalacion && panel.fechaInstalacion !== null) {
                 fechaInstalacion = new Date(panel.fechaInstalacion);
             }
 
             // Detectar fecha de desmontaje
-            if (panel.fechaDesmontaje) {
+            if (panel.fechaDesmontaje && panel.fechaDesmontaje !== null) {
                 fechaDesmontaje = new Date(panel.fechaDesmontaje);
             }
 
@@ -3038,6 +3391,12 @@
                 tipo = 'inactivo';
             }
 
+            // NUEVO: Si no hay fechas (null), asumir que está activo todo el mes
+            if (!fechaInstalacion && !fechaDesmontaje) {
+                diasFacturables = diasBase;
+                tipo = 'completo';
+            }
+
             const importe = diasFacturables * tarifaDiaria;
 
             return {
@@ -3055,6 +3414,437 @@
             return new Date(year, month, 0).getDate();
         }
 
+        // ===== UTILIDADES PARA PANEL PICKER =====
+        
+        // Normalizar texto para búsqueda sin tildes ni mayúsculas
+        function normalizeString(str) {
+            if (!str) return '';
+            return str.toLowerCase()
+                     .normalize('NFD')
+                     .replace(/[\u0300-\u036f]/g, ''); // Eliminar diacríticos
+        }
+
+        // Obtener paneles únicos y ordenados para el picker
+        function getPanelsForPicker() {
+            if (!panelsData || panelsData.length === 0) return [];
+            
+            // Eliminar duplicados por código
+            const uniquePanels = panelsData.filter((panel, index, self) => 
+                self.findIndex(p => p.codigo === panel.codigo) === index
+            );
+            
+            // Ordenar por municipio y luego por código
+            return uniquePanels.sort((a, b) => {
+                const municipioCompare = a.municipio.localeCompare(b.municipio, 'es');
+                if (municipioCompare !== 0) return municipioCompare;
+                return a.codigo.localeCompare(b.codigo, undefined, { numeric: true });
+            });
+        }
+
+        // ===== COMPONENTE PANEL PICKER =====
+        
+        let panelPickerInstances = {};
+        
+        function createPanelPicker(containerId, options = {}) {
+            const {
+                onChange = () => {},
+                onClear = () => {},
+                placeholder = "Buscar por código o municipio...",
+                required = true,
+                preselectedId = null
+            } = options;
+
+            const container = document.getElementById(containerId);
+            if (!container) return null;
+
+            // Estado del picker
+            const state = {
+                isOpen: false,
+                selectedPanel: null,
+                filteredPanels: [],
+                highlightedIndex: -1,
+                searchTerm: ''
+            };
+
+            // HTML del componente
+            container.innerHTML = `
+                <div class="panel-picker" role="combobox" aria-expanded="false" aria-haspopup="listbox">
+                    <div class="panel-picker-input-container">
+                        <input 
+                            type="text" 
+                            class="panel-picker-input" 
+                            placeholder="${placeholder}"
+                            autocomplete="off"
+                            aria-autocomplete="list"
+                            aria-label="Buscar panel"
+                            ${required ? 'required' : ''}
+                        />
+                        <button type="button" class="panel-picker-clear" style="display: none;" aria-label="Limpiar selección">
+                            <span>&times;</span>
+                        </button>
+                    </div>
+                    <div class="panel-picker-dropdown" role="listbox" style="display: none;">
+                        <div class="panel-picker-loading">Cargando paneles...</div>
+                        <div class="panel-picker-no-results" style="display: none;">Sin resultados</div>
+                        <div class="panel-picker-list"></div>
+                    </div>
+                    <div class="panel-picker-selected" style="display: none;">
+                        <small>Panel seleccionado:</small>
+                        <div class="panel-picker-selected-info"></div>
+                    </div>
+                </div>
+            `;
+
+            // Referencias a elementos
+            const picker = container.querySelector('.panel-picker');
+            const input = container.querySelector('.panel-picker-input');
+            const clearBtn = container.querySelector('.panel-picker-clear');
+            const dropdown = container.querySelector('.panel-picker-dropdown');
+            const loading = container.querySelector('.panel-picker-loading');
+            const noResults = container.querySelector('.panel-picker-no-results');
+            const list = container.querySelector('.panel-picker-list');
+            const selectedDiv = container.querySelector('.panel-picker-selected');
+            const selectedInfo = container.querySelector('.panel-picker-selected-info');
+
+            // Funciones internas
+            function updateDropdown() {
+                const panels = getPanelsForPicker();
+                
+                if (panels.length === 0) {
+                    loading.style.display = 'block';
+                    noResults.style.display = 'none';
+                    list.innerHTML = '';
+                    return;
+                }
+
+                loading.style.display = 'none';
+                
+                // Filtrar paneles
+                const searchNormalized = normalizeString(state.searchTerm);
+                state.filteredPanels = panels.filter(panel => {
+                    const codigoNormalized = normalizeString(panel.codigo);
+                    const municipioNormalized = normalizeString(panel.municipio);
+                    return codigoNormalized.includes(searchNormalized) || 
+                           municipioNormalized.includes(searchNormalized);
+                });
+
+                if (state.filteredPanels.length === 0) {
+                    noResults.style.display = 'block';
+                    list.innerHTML = '';
+                } else {
+                    noResults.style.display = 'none';
+                    renderList();
+                }
+            }
+
+            function renderList() {
+                list.innerHTML = '';
+                
+                state.filteredPanels.forEach((panel, index) => {
+                    const option = document.createElement('div');
+                    option.className = 'panel-picker-option';
+                    option.setAttribute('role', 'option');
+                    option.setAttribute('aria-selected', 'false');
+                    option.textContent = `${panel.codigo} — ${panel.municipio}`;
+                    option.dataset.index = index;
+                    
+                    if (index === state.highlightedIndex) {
+                        option.classList.add('highlighted');
+                        option.setAttribute('aria-selected', 'true');
+                    }
+                    
+                    option.addEventListener('click', () => selectPanel(panel));
+                    list.appendChild(option);
+                });
+            }
+
+            function selectPanel(panel) {
+                state.selectedPanel = panel;
+                input.value = `${panel.codigo} — ${panel.municipio}`;
+                clearBtn.style.display = 'block';
+                selectedDiv.style.display = 'block';
+                selectedInfo.textContent = `${panel.codigo} — ${panel.municipio}`;
+                closeDropdown();
+                onChange(panel);
+            }
+
+            function clearSelection() {
+                state.selectedPanel = null;
+                input.value = '';
+                clearBtn.style.display = 'none';
+                selectedDiv.style.display = 'none';
+                state.searchTerm = '';
+                onClear();
+            }
+
+            function openDropdown() {
+                state.isOpen = true;
+                dropdown.style.display = 'block';
+                picker.setAttribute('aria-expanded', 'true');
+                updateDropdown();
+            }
+
+            function closeDropdown() {
+                state.isOpen = false;
+                dropdown.style.display = 'none';
+                picker.setAttribute('aria-expanded', 'false');
+                state.highlightedIndex = -1;
+            }
+
+            function navigateList(direction) {
+                if (state.filteredPanels.length === 0) return;
+                
+                if (direction === 'up') {
+                    state.highlightedIndex = state.highlightedIndex <= 0 
+                        ? state.filteredPanels.length - 1 
+                        : state.highlightedIndex - 1;
+                } else {
+                    state.highlightedIndex = state.highlightedIndex >= state.filteredPanels.length - 1 
+                        ? 0 
+                        : state.highlightedIndex + 1;
+                }
+                
+                renderList();
+                
+                // Scroll automático
+                const highlighted = list.querySelector('.highlighted');
+                if (highlighted) {
+                    highlighted.scrollIntoView({ block: 'nearest' });
+                }
+            }
+
+            // Event listeners
+            input.addEventListener('input', (e) => {
+                state.searchTerm = e.target.value;
+                state.highlightedIndex = -1;
+                if (!state.isOpen) openDropdown();
+                updateDropdown();
+            });
+
+            input.addEventListener('focus', () => {
+                if (!state.isOpen) openDropdown();
+            });
+
+            input.addEventListener('keydown', (e) => {
+                switch (e.key) {
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        if (!state.isOpen) openDropdown();
+                        else navigateList('down');
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        navigateList('up');
+                        break;
+                    case 'Enter':
+                        e.preventDefault();
+                        if (state.isOpen && state.highlightedIndex >= 0) {
+                            selectPanel(state.filteredPanels[state.highlightedIndex]);
+                        }
+                        break;
+                    case 'Escape':
+                        e.preventDefault();
+                        closeDropdown();
+                        break;
+                }
+            });
+
+            clearBtn.addEventListener('click', clearSelection);
+
+            // Cerrar al hacer click fuera
+            document.addEventListener('click', (e) => {
+                if (!picker.contains(e.target)) {
+                    closeDropdown();
+                }
+            });
+
+            // Preselección si se proporciona
+            if (preselectedId) {
+                const panels = getPanelsForPicker();
+                const preselected = panels.find(p => p.codigo === preselectedId);
+                if (preselected) {
+                    selectPanel(preselected);
+                }
+            }
+
+            // API pública
+            const api = {
+                getValue: () => state.selectedPanel,
+                setValue: (panelId) => {
+                    const panels = getPanelsForPicker();
+                    const panel = panels.find(p => p.codigo === panelId);
+                    if (panel) selectPanel(panel);
+                },
+                clear: clearSelection,
+                isValid: () => required ? !!state.selectedPanel : true
+            };
+
+            panelPickerInstances[containerId] = api;
+            return api;
+        }
+
+        // Función para obtener instancia del picker
+        function getPanelPicker(containerId) {
+            return panelPickerInstances[containerId];
+        }
+
+        // ===== FIN PANEL PICKER =====
+
+        // ===== CÁLCULOS DE FACTURACIÓN AJUSTADA =====
+
+        // Función centralizada para calcular facturación ajustada según reglas de negocio
+        function calcularFacturacionAjustada(fechaAlta, fechaDesmontaje, tarifaBaseMes = 37.70) {
+            // Constantes
+            const DIAS_BASE_MES = 30;
+            const tarifaDiaria = tarifaBaseMes / DIAS_BASE_MES;
+            
+            let diasActivos = 0;
+            let descripcion = '';
+            
+            // Parsear fechas si son strings
+            const alta = fechaAlta ? new Date(fechaAlta) : null;
+            const desmontaje = fechaDesmontaje ? new Date(fechaDesmontaje) : null;
+            
+            if (alta && desmontaje) {
+                // Caso: ALTA y DESMONTAJE en el mismo mes
+                const diaAlta = alta.getDate();
+                const diaDesmontaje = desmontaje.getDate();
+                diasActivos = Math.max(0, Math.min(30, diaDesmontaje - diaAlta + 1));
+                descripcion = `Alta día ${diaAlta}, desmontaje día ${diaDesmontaje}`;
+                
+            } else if (desmontaje) {
+                // Caso: Solo DESMONTAJE
+                const diaDesmontaje = desmontaje.getDate();
+                diasActivos = Math.min(30, diaDesmontaje);
+                descripcion = `Desmontaje día ${diaDesmontaje}`;
+                
+            } else if (alta) {
+                // Caso: Solo ALTA
+                const diaAlta = alta.getDate();
+                diasActivos = Math.max(0, 30 - diaAlta + 1);
+                descripcion = `Alta día ${diaAlta}`;
+                
+            } else {
+                // Caso: Mes completo
+                diasActivos = 30;
+                descripcion = 'Mes completo';
+            }
+            
+            // Cálculos finales
+            const facturacionAjustada = Math.round(tarifaDiaria * diasActivos * 100) / 100; // Redondeo bancario
+            const facturacionCompleta = tarifaBaseMes;
+            const ahorro = Math.round((facturacionCompleta - facturacionAjustada) * 100) / 100;
+            
+            // Limitar resultados: 0 ≤ facturación_ajustada ≤ tarifa_base_mes
+            const facturacionFinal = Math.max(0, Math.min(tarifaBaseMes, facturacionAjustada));
+            const ahorroFinal = Math.max(0, facturacionCompleta - facturacionFinal);
+            
+            return {
+                diasActivos,
+                facturacionCompleta,
+                facturacionAjustada: facturacionFinal,
+                ahorro: ahorroFinal,
+                tarifaDiaria,
+                descripcion
+            };
+        }
+
+        // Formatear importe en euros según estándar español
+        function formatearImporteEuro(cantidad) {
+            return cantidad.toLocaleString('es-ES', {
+                style: 'currency',
+                currency: 'EUR',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        // Sistema de notificaciones Toast
+        function showToast(message, type = 'info', duration = 5000) {
+            // Crear contenedor de toasts si no existe
+            let toastContainer = document.getElementById('toastContainer');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toastContainer';
+                toastContainer.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    z-index: 10000;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                `;
+                document.body.appendChild(toastContainer);
+            }
+
+            // Crear elemento toast
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                background: ${type === 'success' ? '#16a34a' : type === 'error' ? '#dc2626' : type === 'warning' ? '#d97706' : '#2563eb'};
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                max-width: 400px;
+                font-size: 14px;
+                font-weight: 500;
+                white-space: pre-line;
+                opacity: 0;
+                transform: translateX(100%);
+                transition: all 0.3s ease;
+            `;
+            
+            toast.textContent = message;
+            toastContainer.appendChild(toast);
+
+            // Animar entrada
+            setTimeout(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateX(0)';
+            }, 10);
+
+            // Animar salida y remover
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 300);
+            }, duration);
+
+            return toast;
+        }
+
+        // Función de test para verificar cálculos
+        function testCalculosFacturacion() {
+            console.log('🧪 TESTS DE FACTURACIÓN AJUSTADA');
+            console.log('Base: 37,70 € → Tarifa diaria: 1,256666...');
+            
+            const tests = [
+                { desc: 'Solo DESMONTAJE 04/11/2025', alta: null, desmontaje: '2025-11-04', esperado: { dias: 4, ajustada: 5.03, ahorro: 32.67 } },
+                { desc: 'Solo DESMONTAJE 30/11/2025', alta: null, desmontaje: '2025-11-30', esperado: { dias: 30, ajustada: 37.70, ahorro: 0.00 } },
+                { desc: 'Solo ALTA 10/11/2025', alta: '2025-11-10', desmontaje: null, esperado: { dias: 21, ajustada: 26.39, ahorro: 11.31 } },
+                { desc: 'ALTA 05/11 y DESMONTAJE 12/11', alta: '2025-11-05', desmontaje: '2025-11-12', esperado: { dias: 8, ajustada: 10.05, ahorro: 27.65 } }
+            ];
+            
+            tests.forEach(test => {
+                const resultado = calcularFacturacionAjustada(test.alta, test.desmontaje);
+                console.log(`📋 ${test.desc}`);
+                console.log(`   Días activos: ${resultado.diasActivos} (esperado: ${test.esperado.dias})`);
+                console.log(`   Facturación ajustada: ${formatearImporteEuro(resultado.facturacionAjustada)} (esperado: ${test.esperado.ajustada} €)`);
+                console.log(`   Ahorro: ${formatearImporteEuro(resultado.ahorro)} (esperado: ${test.esperado.ahorro} €)`);
+                console.log('---');
+            });
+        }
+
+        // Exponer función de test globalmente
+        window.testCalculosFacturacion = testCalculosFacturacion;
+
+        // ===== FIN CÁLCULOS DE FACTURACIÓN =====
+
         // Calcular Facturación (funciñn legacy - se mantiene por compatibilidad)
         function calculateBilling(days) {
             const baseRate = parseFloat(document.getElementById('baseRate').value);
@@ -3066,6 +3856,21 @@
         function calculateDays(panel, month, year) {
             const facturacion = calcularFacturacion(panel, month, year);
             return facturacion.dias;
+        }
+
+        // Formatear números al formato español (16.851,90 €)
+        function formatEuro(amount) {
+            if (amount === null || amount === undefined || isNaN(amount)) {
+                return '0,00 €';
+            }
+            
+            const numero = parseFloat(amount);
+            return numero.toLocaleString('es-ES', {
+                style: 'currency',
+                currency: 'EUR',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
         }
 
         // Actualizar tabla
@@ -3126,34 +3931,225 @@
                             </div>
                             <div class="minimal-list-item-stat">
                                 <span class="minimal-list-item-stat-label">Facturación</span>
-                                <span class="minimal-list-item-stat-value">${billing} €</span>
+                                <span class="minimal-list-item-stat-value">${formatEuro(billing)}</span>
                             </div>
                         </div>
                     </div>
                     <div class="minimal-list-item-actions">
                         <span class="minimal-list-item-badge ${estadoClass}">${estadoBadge}</span>
-                        <button class="minimal-action-btn delete" onclick="deletePanel(${index})" title="Eliminar">
-                            <span>—ï</span>
-                        </button>
                     </div>
                 `;
                 panelsList.appendChild(listItem);
             });
 
             // Actualizar estadísticas
-            document.getElementById('totalPanels').textContent = panelsData.length;
-            document.getElementById('totalRevenue').textContent = totalRevenue.toFixed(2).replace('.', ',') + ' €';
-            document.getElementById('totalMunicipios').textContent = municipios.size;
-            document.getElementById('partialPanels').textContent = partialCount;
+            const totalPanelsEl = document.getElementById('totalPanels');
+            const totalRevenueEl = document.getElementById('totalRevenue');
+            const totalMunicipiosEl = document.getElementById('totalMunicipios');
+            const partialPanelsEl = document.getElementById('partialPanels');
+            
+            if (totalPanelsEl) totalPanelsEl.textContent = panelsData.length;
+            if (totalRevenueEl) totalRevenueEl.textContent = formatEuro(totalRevenue);
+            if (totalMunicipiosEl) totalMunicipiosEl.textContent = municipios.size;
+            if (partialPanelsEl) partialPanelsEl.textContent = partialCount;
 
             // Actualizar estadísticas VestaCP
             actualizarEstadisticas();
             actualizarBadges();
+            
+            // Asegurar que los filtros estén poblados
+            populateFilters();
         }
 
         // Filtrar tabla
         function filterTable() {
-            updateTable(); // Simplemente recargar con el filtro aplicado
+            applyFilters(); // Redirigir a la nueva función
+        }
+
+        // Nueva función para aplicar múltiples filtros
+        function applyFilters() {
+            const month = parseInt(document.getElementById('currentMonth').value);
+            const year = parseInt(document.getElementById('currentYear').value);
+            
+            // Obtener valores de filtros
+            const searchTerm = document.getElementById('searchInput').value.toUpperCase();
+            const filterMunicipio = document.getElementById('filterMunicipio').value;
+            const filterEstado = document.getElementById('filterEstado').value;
+            const filterFacturacion = document.getElementById('filterFacturacion').value;
+            
+            const panelsList = document.getElementById('panelsList');
+            panelsList.innerHTML = '';
+
+            let totalRevenue = 0;
+            let partialCount = 0;
+            let filteredCount = 0;
+            const municipios = new Set();
+
+            panelsData.forEach((panel, index) => {
+                const days = calculateDays(panel, month, year);
+                const billing = calculateBilling(days);
+                
+                // Determinar estado del panel
+                let estado = '';
+                if (panel.fechaDesmontaje) {
+                    estado = 'desmontado';
+                } else if (days < 30) {
+                    estado = 'pausado';
+                } else {
+                    estado = 'activo';
+                }
+                
+                // Aplicar filtros
+                let shouldShow = true;
+                
+                // Filtro de búsqueda
+                if (searchTerm && !panel.municipio.toUpperCase().includes(searchTerm) && !panel.codigo.toUpperCase().includes(searchTerm)) {
+                    shouldShow = false;
+                }
+                
+                // Filtro de municipio
+                if (filterMunicipio && panel.municipio !== filterMunicipio) {
+                    shouldShow = false;
+                }
+                
+                // Filtro de estado
+                if (filterEstado && estado !== filterEstado) {
+                    shouldShow = false;
+                }
+                
+                // Filtro de facturación
+                if (filterFacturacion) {
+                    if (filterFacturacion === 'completa' && days < 30) shouldShow = false;
+                    if (filterFacturacion === 'parcial' && (days >= 30 || days === 0)) shouldShow = false;
+                    if (filterFacturacion === 'sin_facturar' && days > 0) shouldShow = false;
+                }
+                
+                if (!shouldShow) return;
+                
+                // Contar para estadísticas
+                filteredCount++;
+                totalRevenue += parseFloat(billing);
+                municipios.add(panel.municipio);
+                if (days < 30) partialCount++;
+
+                // Determinar badge
+                let estadoBadge = '';
+                let estadoClass = '';
+                if (panel.fechaDesmontaje) {
+                    estadoBadge = 'Desmontado';
+                    estadoClass = 'minimal-badge-dismounted';
+                } else if (days < 30) {
+                    estadoBadge = 'Pausado';
+                    estadoClass = 'minimal-badge-paused';
+                } else {
+                    estadoBadge = 'Activo';
+                    estadoClass = 'minimal-badge-active';
+                }
+
+                const listItem = document.createElement('div');
+                listItem.className = 'minimal-list-item fade-in';
+                listItem.innerHTML = `
+                    <div class="minimal-list-item-info">
+                        <div class="minimal-list-item-main">
+                            <span class="minimal-list-item-municipio">${panel.municipio}</span>
+                            <span class="minimal-list-item-separator">•</span>
+                            <span class="minimal-list-item-codigo">${panel.codigo}</span>
+                        </div>
+                        <div class="minimal-list-item-meta">
+                            <div class="minimal-list-item-stat">
+                                <span class="minimal-list-item-stat-label">Días</span>
+                                <span class="minimal-list-item-stat-value">${days}</span>
+                            </div>
+                            <div class="minimal-list-item-stat">
+                                <span class="minimal-list-item-stat-label">Facturación</span>
+                                <span class="minimal-list-item-stat-value">${formatEuro(billing)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="minimal-list-item-actions">
+                        <span class="minimal-list-item-badge ${estadoClass}">${estadoBadge}</span>
+                    </div>
+                `;
+                panelsList.appendChild(listItem);
+            });
+
+            // Actualizar contador de resultados
+            const resultsCount = document.getElementById('resultsCount');
+            if (resultsCount) {
+                resultsCount.textContent = `${filteredCount} de ${panelsData.length} paneles`;
+            }
+
+            // Actualizar estadísticas (solo las de la tabla inferior, no las principales)
+            const totalPanelsEl = document.getElementById('totalPanels');
+            const totalRevenueEl = document.getElementById('totalRevenue');
+            const totalMunicipiosEl = document.getElementById('totalMunicipios');
+            const partialPanelsEl = document.getElementById('partialPanels');
+            
+            if (totalPanelsEl) totalPanelsEl.textContent = panelsData.length;
+            if (totalRevenueEl) totalRevenueEl.textContent = formatEuro(totalRevenue);
+            if (totalMunicipiosEl) totalMunicipiosEl.textContent = municipios.size;
+            if (partialPanelsEl) partialPanelsEl.textContent = partialCount;
+
+            // Las estadísticas principales no cambian con los filtros
+            actualizarEstadisticas();
+            actualizarBadges();
+        }
+
+        // Limpiar todos los filtros
+        function clearFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('filterMunicipio').value = '';
+            document.getElementById('filterEstado').value = '';
+            document.getElementById('filterFacturacion').value = '';
+            applyFilters();
+        }
+
+        // Poblar lista de municipios en el filtro
+        function populateFilters() {
+            console.log('🏛️ populateFilters() iniciando...');
+            
+            // Verificar que hay datos disponibles
+            if (!panelsData || panelsData.length === 0) {
+                console.warn('⚠️ populateFilters: No hay datos disponibles aún', {
+                    panelsData: !!panelsData,
+                    length: panelsData ? panelsData.length : 'undefined'
+                });
+                return;
+            }
+
+            console.log('📊 panelsData disponible:', panelsData.length, 'paneles');
+
+            const municipios = [...new Set(panelsData.map(p => p.municipio))].filter(m => m).sort();
+            console.log('🏘️ Municipios únicos encontrados:', municipios.length, municipios);
+            
+            const filterMunicipio = document.getElementById('filterMunicipio');
+            console.log('🎯 Elemento filterMunicipio:', !!filterMunicipio);
+            
+            if (!filterMunicipio) {
+                console.error('❌ No se encontró el elemento filterMunicipio');
+                // Intentar de nuevo después de un breve retraso
+                setTimeout(() => {
+                    console.log('🔄 Reintentando populateFilters después de 1 segundo...');
+                    populateFilters();
+                }, 1000);
+                return;
+            }
+            
+            // Limpiar opciones existentes (excepto la primera)
+            filterMunicipio.innerHTML = '<option value="">Todos los municipios</option>';
+            console.log('🗑️ Select limpiado, opciones actuales:', filterMunicipio.options.length);
+            
+            municipios.forEach((municipio, index) => {
+                const option = document.createElement('option');
+                option.value = municipio;
+                option.textContent = municipio;
+                filterMunicipio.appendChild(option);
+                if (index < 5) { // Solo loguear los primeros 5 para no saturar
+                    console.log(`➕ Agregando municipio ${index + 1}:`, municipio);
+                }
+            });
+            
+            console.log(`✅ Filtro de municipios poblado con ${municipios.length} municipios. Total opciones:`, filterMunicipio.options.length);
         }
 
         // Modales
@@ -3254,25 +4250,85 @@
             }
         }
 
-        // Exportar a CSV
+        // Exportar a Excel
         function exportData() {
             const month = document.getElementById('currentMonth').value;
             const year = document.getElementById('currentYear').value;
+            const monthName = getMonthName(month);
             
-            let csv = 'Municipio,Código Parada,Días,Facturación\n';
+            // Crear los datos para Excel
+            const data = [];
             
+            // Encabezados
+            data.push(['Municipio', 'Código Parada', 'Días', 'Facturación']);
+            
+            // Datos de paneles
             panelsData.forEach(panel => {
                 const days = calculateDays(panel, parseInt(month), parseInt(year));
-                const billing = calculateBilling(days);
-                csv += `${panel.municipio},${panel.codigo},${days},${billing}\n`;
+                const billing = parseFloat(calculateBilling(days));
+                data.push([
+                    panel.municipio,
+                    panel.codigo,
+                    days,
+                    billing
+                ]);
             });
 
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `paneles_${month}_${year}.csv`;
-            a.click();
+            // Crear un nuevo workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Crear worksheet a partir de los datos
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            
+            // Aplicar formato a los encabezados (primera fila)
+            const headerStyle = {
+                font: { bold: true },
+                fill: { fgColor: { rgb: "D3D3D3" } }, // Gris claro
+                alignment: { horizontal: "center" }
+            };
+            
+            // Aplicar estilo a la primera fila (encabezados)
+            ['A1', 'B1', 'C1', 'D1'].forEach(cell => {
+                if (!ws[cell]) ws[cell] = {};
+                ws[cell].s = headerStyle;
+            });
+            
+            // Ajustar ancho de columnas automáticamente
+            const colWidths = [];
+            data.forEach(row => {
+                row.forEach((cell, i) => {
+                    const cellLength = cell ? cell.toString().length : 0;
+                    if (!colWidths[i] || colWidths[i] < cellLength) {
+                        colWidths[i] = cellLength;
+                    }
+                });
+            });
+            
+            // Establecer ancho de columnas (con un mínimo de 10 y máximo de 50)
+            ws['!cols'] = colWidths.map(width => ({
+                wch: Math.max(10, Math.min(50, width + 2))
+            }));
+            
+            // Formato para columna de facturación (números con 2 decimales)
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            for (let row = 1; row <= range.e.r; row++) {
+                const cellAddress = XLSX.utils.encode_cell({ r: row, c: 3 }); // Columna D (Facturación)
+                if (ws[cellAddress] && typeof ws[cellAddress].v === 'number') {
+                    if (!ws[cellAddress].s) ws[cellAddress].s = {};
+                    ws[cellAddress].s.numFmt = '#,##0.00';
+                }
+            }
+            
+            // Agregar worksheet al workbook
+            XLSX.utils.book_append_sheet(wb, ws, `Paneles ${monthName} ${year}`);
+            
+            // Generar nombre de archivo
+            const fileName = `paneles_${monthName.toLowerCase()}_${year}.xlsx`;
+            
+            // Descargar el archivo
+            XLSX.writeFile(wb, fileName);
+            
+            console.log(`✅ Archivo Excel generado: ${fileName}`);
         }
 
         // Función auxiliar para obtener nombre del mes
@@ -3313,7 +4369,7 @@
                     html += `<tr style="background: ${bgColor};">`;
                     html += `<td style="padding: 10px; color: var(--text);"><strong>${monthName} ${record.year}</strong></td>`;
                     html += `<td style="padding: 10px; text-align: center; color: var(--text);">${record.totalPaneles}</td>`;
-                    html += `<td style="padding: 10px; text-align: right; color: var(--text);">${record.facturacionTotal.toFixed(2)} €</td>`;
+                    html += `<td style="padding: 10px; text-align: right; color: var(--text);">${formatEuro(record.facturacionTotal)}</td>`;
                     html += `<td style="padding: 10px; text-align: center; font-size: 13px; color: var(--muted);">${fechaFormat}</td>`;
                     html += '</tr>';
                 });
@@ -3371,7 +4427,7 @@
                         html += `<td style="padding: 6px;"><strong>${alta.codigo}</strong></td>`;
                         html += `<td style="padding: 6px;">${alta.municipio}</td>`;
                         html += `<td style="padding: 6px; text-align: center;">${alta.fechaInstalacion || '-'}</td>`;
-                        html += `<td style=\"padding: 6px; text-align: right;\">${alta.tarifa ? (alta.tarifa.toFixed(2) + ' €') : 'Base'}</td>`;
+                        html += `<td style=\"padding: 6px; text-align: right;\">${alta.tarifa ? formatEuro(alta.tarifa) : 'Base'}</td>`;
                         html += `</tr>`;
                     });
                     
@@ -3444,8 +4500,8 @@
                         html += `<tr style="background: ${bg};">`;
                         html += `<td style="padding: 6px;"><strong>${tarifa.codigo}</strong></td>`;
                         html += `<td style="padding: 6px;">${tarifa.municipio}</td>`;
-                        html += `<td style=\"padding: 6px; text-align: right;\">${tarifa.tarifaAnterior ? (tarifa.tarifaAnterior.toFixed(2) + ' €') : 'Base'}</td>`;
-                        html += `<td style=\"padding: 6px; text-align: right; color: #7C3AED; font-weight: 600;\">${tarifa.tarifaNueva.toFixed(2)} €</td>`;
+                        html += `<td style=\"padding: 6px; text-align: right;\">${tarifa.tarifaAnterior ? formatEuro(tarifa.tarifaAnterior) : 'Base'}</td>`;
+                        html += `<td style=\"padding: 6px; text-align: right; color: #7C3AED; font-weight: 600;\">${formatEuro(tarifa.tarifaNueva)}</td>`;
                         html += `<td style="padding: 6px; text-align: center;">${tarifa.fechaCambio || '-'}</td>`;
                         html += `</tr>`;
                     });
@@ -3542,10 +4598,51 @@
         // ====================
 
         // Función para actualizar dashboard en tiempo real
-        function actualizarDashboard() {
-            const month = parseInt(document.getElementById('currentMonth').value);
-            const year = parseInt(document.getElementById('currentYear').value);
+        async function actualizarDashboard() {
+            // Verificar que los elementos del selector de fecha existen
+            const monthElement = document.getElementById('currentMonth');
+            const yearElement = document.getElementById('currentYear');
             
+            if (!monthElement || !yearElement) {
+                console.warn('⚠️ Elementos de selector de fecha no encontrados');
+                return;
+            }
+            
+            const month = parseInt(monthElement.value);
+            const year = parseInt(yearElement.value);
+            
+            try {
+                // Leer datos reales desde Firestore billing_summary
+                const monthKey = `${year}${month.toString().padStart(2, '0')}`;
+                const summary = await BillingService.getMonthBillingSummary(monthKey);
+                
+                // Usar datos de Firestore si están disponibles
+                if (summary) {
+                    // Actualizar DOM con datos reales desde Firestore
+                    const statTotalEl = document.getElementById('statTotal');
+                    const statFacturacionEl = document.getElementById('statFacturacion');
+                    const statActivosEl = document.getElementById('statActivos');
+                    
+                    if (statTotalEl) statTotalEl.textContent = summary.activePanels;
+                    if (statFacturacionEl) statFacturacionEl.textContent = formatEuro(summary.totalRevenue);
+                    if (statActivosEl) statActivosEl.textContent = summary.activePanels;
+                    
+                    // Actualizar elemento totalRevenue si existe (para compatibilidad)
+                    const totalRevenueEl = document.getElementById('totalRevenue');
+                    if (totalRevenueEl) totalRevenueEl.textContent = formatEuro(summary.totalRevenue);
+                    
+                    console.log(`📊 Dashboard actualizado desde Firestore: ${summary.activePanels} paneles, ${formatEuro(summary.totalRevenue)}`);
+                    return;
+                }
+                
+                console.log('⚠️ No hay datos en billing_summary, calculando desde panelsData local...');
+                
+            } catch (error) {
+                console.error('❌ Error leyendo billing_summary:', error);
+                console.log('⚠️ Fallback a cálculos locales...');
+            }
+            
+            // Fallback: usar cálculo local si no hay datos en Firestore
             let totalPaneles = 0;
             let facturacionTotal = 0;
             let panelesParciales = 0;
@@ -3566,11 +4663,18 @@
                 }
             });
 
-            // Actualizar DOM
-            document.getElementById('totalPanels').textContent = totalPaneles;
-            document.getElementById('totalRevenue').textContent = facturacionTotal.toFixed(2).replace('.', ',') + ' €';
-            document.getElementById('totalMunicipios').textContent = municipiosUnicos.size;
-            document.getElementById('partialPanels').textContent = panelesParciales;
+            // Actualizar DOM con validaciones
+            const statTotalEl = document.getElementById('statTotal');
+            const statFacturacionEl = document.getElementById('statFacturacion');
+            const statActivosEl = document.getElementById('statActivos');
+            
+            if (statTotalEl) statTotalEl.textContent = totalPaneles;
+            if (statFacturacionEl) statFacturacionEl.textContent = formatEuro(facturacionTotal);
+            if (statActivosEl) statActivosEl.textContent = totalPaneles;
+            
+            // Actualizar elemento totalRevenue si existe (para compatibilidad)
+            const totalRevenueEl = document.getElementById('totalRevenue');
+            if (totalRevenueEl) totalRevenueEl.textContent = formatEuro(facturacionTotal);
         }
 
         // Toggle dropdown menu
@@ -3641,30 +4745,84 @@
             actualizarVistaPreviewAlta();
         }
 
-        function actualizarVistaPreviewAlta() {
-            const fecha = document.getElementById('altaFecha').value;
-            if (!fecha) {
-                document.getElementById('altaDias').textContent = '-';
-                document.getElementById('altaTotal').textContent = '-';
+        async function actualizarVistaPreviewAlta() {
+            // Verificar que los elementos existen antes de usarlos
+            const diasElement = document.getElementById('altaDias');
+            const totalElement = document.getElementById('altaTotal');
+            const noFacturadoElement = document.getElementById('altaNoFacturado');
+            
+            if (!diasElement || !totalElement || !noFacturadoElement) {
+                console.warn('⚠️ Elementos del modal de alta no encontrados');
                 return;
             }
 
-            const fechaInstalacion = new Date(fecha);
-            const mes = parseInt(document.getElementById('currentMonth').value);
-            const year = parseInt(document.getElementById('currentYear').value);
+            const fechaElement = document.getElementById('altaFecha');
+            const fecha = fechaElement ? fechaElement.value : '';
             
-            // Calcular días a facturar
-            let diasFacturables = 30;
-            if (fechaInstalacion.getMonth() + 1 === mes && fechaInstalacion.getFullYear() === year) {
-                const diaInstalacion = fechaInstalacion.getDate();
-                diasFacturables = 30 - diaInstalacion + 1;
+            if (!fecha) {
+                diasElement.textContent = '-';
+                totalElement.textContent = '-';
+                noFacturadoElement.textContent = '-';
+                return;
             }
 
-            const tarifaDiaria = 37.70 / 30;
-            const total = diasFacturables * tarifaDiaria;
+            // Generar ID temporal para el panel nuevo
+            const codigoElement = document.getElementById('altaCodigo');
+            const codigo = codigoElement ? codigoElement.value.trim() : '';
+            
+            if (!codigo) {
+                diasElement.textContent = '-';
+                totalElement.textContent = '-';
+                noFacturadoElement.textContent = '-';
+                return;
+            }
 
-            document.getElementById('altaDias').textContent = `${diasFacturables} días`;
-            document.getElementById('altaTotal').textContent = `${total.toFixed(2)} €`;
+            try {
+                // Usar BillingService para previsualización de ALTA
+                const preview = await BillingService.previewChange(
+                    codigo,
+                    BillingService.CHANGE_ACTIONS.ALTA,
+                    fecha,
+                    { tarifaBaseMes: BillingService.TARIFA_BASE_2025 }
+                );
+
+                if (preview.valid) {
+                    const { diasFacturables, importeAFacturar, importeNoFacturado, estadoActual, estadoFuturo } = preview.preview;
+                    
+                    diasElement.textContent = `${diasFacturables} días`;
+                    totalElement.textContent = formatearImporteEuro(importeAFacturar);
+                    noFacturadoElement.textContent = formatearImporteEuro(importeNoFacturado);
+                    
+                    // Mostrar información de estado
+                    console.log('📊 Previsualización Alta (BillingService):', {
+                        codigo,
+                        fecha,
+                        estadoActual,
+                        estadoFuturo,
+                        diasFacturables,
+                        importeAFacturar,
+                        importeNoFacturado
+                    });
+                } else {
+                    // Mostrar error de validación o usar cálculo local
+                    console.warn('⚠️ Preview no válido, usando cálculo local:', preview.error);
+                    
+                    // Fallback al cálculo local
+                    const calculo = calcularFacturacionAjustada(fecha, null, 37.70);
+                    diasElement.textContent = `${calculo.diasActivos} días`;
+                    totalElement.textContent = formatearImporteEuro(calculo.facturacionAjustada);
+                    noFacturadoElement.textContent = formatearImporteEuro(calculo.ahorro);
+                }
+                
+            } catch (error) {
+                console.error('❌ Error obteniendo previsualización de alta:', error);
+                
+                // Fallback al cálculo anterior si BillingService falla
+                const calculo = calcularFacturacionAjustada(fecha, null, 37.70);
+                diasElement.textContent = `${calculo.diasActivos} días`;
+                totalElement.textContent = formatearImporteEuro(calculo.facturacionAjustada);
+                noFacturadoElement.textContent = formatearImporteEuro(calculo.ahorro);
+            }
         }
 
         async function guardarAlta() {
@@ -3675,75 +4833,111 @@
 
             // Validaciones
             if (!municipio) {
-                alert('ï Por favor selecciona un municipio');
+                showToast('❌ Por favor selecciona un municipio', 'error');
                 return;
             }
             if (!codigo) {
-                alert(' Por favor ingresa un Código de panel');
+                showToast('❌ Por favor ingresa un código de panel', 'error');
                 return;
             }
             if (!fecha) {
-                alert('ï Por favor selecciona una fecha de instalación');
+                showToast('❌ Por favor selecciona una fecha de instalación', 'error');
                 return;
             }
 
-            // Verificar Código duplicado
+            // Verificar código duplicado en datos locales
             const duplicado = panelsData.find(p => p.codigo.toLowerCase() === codigo.toLowerCase());
             if (duplicado) {
-                alert(` Ya existe un panel con el Código "${codigo}"\n\nPor favor usa un Código diferente.`);
+                showToast(`❌ Ya existe un panel con el código "${codigo}"\n\nPor favor usa un código diferente.`, 'error');
                 return;
             }
 
-            // Crear nuevo panel
-            const nuevoPanel = {
-                municipio: municipio,
-                codigo: codigo,
-                tarifa: 37.70,
-                fechaInstalacion: fecha,
-                observaciones: observaciones || null
-            };
-
             try {
-                // Guardar en Firestore
-                if (window.firebaseDB) {
-                    const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
-                    await addDoc(collection(window.firebaseDB, 'paneles'), nuevoPanel);
+                // Obtener usuario actual
+                const user = firebase.auth().currentUser;
+                if (!user) {
+                    throw new Error('Usuario no autenticado');
                 }
 
-                // añadir a panelsData
-                panelsData.push(nuevoPanel);
-                
-                // Registrar cambio
-                const mes = parseInt(document.getElementById('currentMonth').value);
-                const year = parseInt(document.getElementById('currentYear').value);
-                const monthKey = `${year}-${String(mes).padStart(2, '0')}`;
-                
-                if (!monthlyChanges[monthKey]) {
-                    monthlyChanges[monthKey] = [];
+                showToast('Creando panel...', 'info');
+
+                // Aplicar cambio usando BillingService
+                const payload = {
+                    action: BillingService.CHANGE_ACTIONS.ALTA,
+                    effectiveDate: fecha,
+                    motivo: observaciones || 'Alta de panel',
+                    tarifaBaseMes: BillingService.TARIFA_BASE_2025,
+                    uid: user.uid,
+                    email: user.email
+                };
+
+                const result = await BillingService.applyChange(codigo, payload);
+
+                if (result.success) {
+                    if (result.duplicate) {
+                        showToast('Panel ya dado de alta anteriormente', 'warning');
+                    } else {
+                        // Crear nuevo panel en datos locales
+                        const nuevoPanel = {
+                            municipio: municipio,
+                            codigo: codigo,
+                            tarifa: BillingService.TARIFA_BASE_2025,
+                            fechaInstalacion: fecha,
+                            observaciones: observaciones || null,
+                            estadoActual: BillingService.PANEL_STATES.ACTIVO
+                        };
+
+                        // Añadir a panelsData
+                        panelsData.push(nuevoPanel);
+                        
+                        // Guardar en Firestore legacy si existe
+                        if (window.firebaseDB) {
+                            try {
+                                const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+                                await addDoc(collection(window.firebaseDB, 'paneles'), nuevoPanel);
+                            } catch (firestoreError) {
+                                console.warn('⚠️ Error guardando en Firestore legacy:', firestoreError);
+                            }
+                        }
+
+                        // Registrar cambio en el sistema legacy si existe
+                        if (typeof monthlyChanges !== 'undefined') {
+                            const mes = parseInt(document.getElementById('currentMonth').value);
+                            const year = parseInt(document.getElementById('currentYear').value);
+                            const monthKey = `${year}-${String(mes).padStart(2, '0')}`;
+                            
+                            if (!monthlyChanges[monthKey]) {
+                                monthlyChanges[monthKey] = [];
+                            }
+                            
+                            monthlyChanges[monthKey].push({
+                                tipo: 'ALTA',
+                                codigo: codigo,
+                                municipio: municipio,
+                                fecha: fecha,
+                                observaciones: observaciones,
+                                timestamp: new Date().toISOString()
+                            });
+                            
+                            localStorage.setItem(CHANGES_KEY, JSON.stringify(monthlyChanges));
+                        }
+
+                        showToast(`✅ Panel dado de alta exitosamente\n\nCódigo: ${codigo}\nMunicipio: ${municipio}`, 'success');
+                    }
+
+                    // Actualizar interfaz
+                    updateTable();
+                    await actualizarDashboard();
+                    if (typeof saveData === 'function') saveData();
+                    
+                    closeModal('modalAlta');
+                } else {
+                    throw new Error('Error en la aplicación del cambio');
                 }
-                
-                monthlyChanges[monthKey].push({
-                    tipo: 'ALTA',
-                    codigo: codigo,
-                    municipio: municipio,
-                    fecha: fecha,
-                    observaciones: observaciones,
-                    timestamp: new Date().toISOString()
-                });
-                
-                localStorage.setItem(CHANGES_KEY, JSON.stringify(monthlyChanges));
-                
-                // Actualizar interfaz
-                updateTable();
-                actualizarDashboard();
-                saveData();
-                
-                alert(` Panel dado de alta exitosamente\n\nCódigo: ${codigo}\nMunicipio: ${municipio}`);
-                closeModal('modalAlta');
                 
             } catch (error) {
-                console.error(' Error al guardar:', error);
-                alert(` Error al guardar el panel:\n\n${error.message}`);
+                console.error('❌ Error al guardar:', error);
+                showToast(`❌ Error al guardar el panel:\n\n${error.message}`, 'error');
             }
         }
 
@@ -3762,6 +4956,18 @@
             selectMunicipio.innerHTML = '<option value="">Seleccionar municipio...</option>';
             municipios.forEach(m => {
                 selectMunicipio.innerHTML += `<option value="${m}">${m}</option>`;
+            });
+            
+            // Inicializar PanelPicker
+            createPanelPicker('reinstalacionPanelPicker', {
+                onChange: (panel) => {
+                    panelSeleccionadoReinstalacion = panel;
+                    actualizarVistaPreviewReinstalacion();
+                },
+                onClear: () => {
+                    panelSeleccionadoReinstalacion = null;
+                    actualizarVistaPreviewReinstalacion();
+                }
             });
             
             // Mostrar modal
@@ -3836,9 +5042,29 @@
             }
         }
 
+        function actualizarVistaPreviewReinstalacion() {
+            const panelInfo = document.getElementById('reinstalacionPanelInfo');
+            
+            if (!panelInfo) {
+                console.warn('⚠️ Elemento panelInfo del modal de reinstalación no encontrado');
+                return;
+            }
+            
+            if (panelSeleccionadoReinstalacion) {
+                panelInfo.innerHTML = `
+                    <strong>${panelSeleccionadoReinstalacion.codigo}</strong><br>
+                    <span style="color: #64748B; font-size: 13px;">
+                        ${panelSeleccionadoReinstalacion.municipio} — Tarifa: ${formatearImporteEuro(panelSeleccionadoReinstalacion.tarifa || 37.70)}/mes
+                    </span>
+                `;
+            } else {
+                panelInfo.innerHTML = 'Ningún panel seleccionado';
+            }
+        }
+
         async function guardarReinstalacion() {
             if (!panelSeleccionadoReinstalacion) {
-                alert('ï Por favor selecciona un panel');
+                showToast('❌ Por favor selecciona un panel', 'error');
                 return;
             }
 
@@ -3847,58 +5073,97 @@
             const nuevoMunicipio = cambioMunicipio ? document.getElementById('reinstalacionNuevoMunicipio').value : null;
 
             if (!fecha) {
-                alert('ï Por favor selecciona una fecha de reinstalación');
+                showToast('❌ Por favor selecciona una fecha de reinstalación', 'error');
                 return;
             }
 
             if (cambioMunicipio && !nuevoMunicipio) {
-                alert('ï Por favor selecciona el nuevo municipio');
+                showToast('❌ Por favor selecciona el nuevo municipio', 'error');
                 return;
             }
 
             try {
-                // Actualizar panel
-                const panel = panelsData.find(p => p.codigo === panelSeleccionadoReinstalacion.codigo);
-                if (panel) {
-                    panel.fechaDesmontaje = null; // Quitar desmontaje
-                    panel.fechaInstalacion = fecha; // Nueva fecha de instalación
-                    
-                    if (cambioMunicipio) {
-                        panel.municipio = nuevoMunicipio;
+                // Obtener usuario actual
+                const user = firebase.auth().currentUser;
+                if (!user) {
+                    throw new Error('Usuario no autenticado');
+                }
+
+                showToast('Aplicando reinstalación...', 'info');
+
+                // Aplicar cambio usando BillingService
+                const motivo = cambioMunicipio ? 
+                    `Reinstalación con cambio de municipio: ${nuevoMunicipio}` : 
+                    'Reinstalación en mismo municipio';
+
+                const payload = {
+                    action: BillingService.CHANGE_ACTIONS.REINSTALACION,
+                    effectiveDate: fecha,
+                    motivo: motivo,
+                    tarifaBaseMes: panelSeleccionadoReinstalacion.tarifa || BillingService.TARIFA_BASE_2025,
+                    uid: user.uid,
+                    email: user.email
+                };
+
+                const result = await BillingService.applyChange(
+                    panelSeleccionadoReinstalacion.codigo,
+                    payload
+                );
+
+                if (result.success) {
+                    if (result.duplicate) {
+                        showToast('Reinstalación ya aplicada anteriormente', 'warning');
+                    } else {
+                        // Actualizar datos locales si existe el panel en panelsData
+                        const panel = panelsData.find(p => p.codigo === panelSeleccionadoReinstalacion.codigo);
+                        if (panel) {
+                            panel.fechaDesmontaje = null; // Quitar desmontaje
+                            panel.fechaInstalacion = fecha; // Nueva fecha de instalación
+                            panel.estadoActual = BillingService.PANEL_STATES.ACTIVO;
+                            
+                            if (cambioMunicipio) {
+                                panel.municipio = nuevoMunicipio;
+                            }
+                        }
+
+                        // Registrar cambio en el sistema legacy si existe
+                        if (typeof monthlyChanges !== 'undefined') {
+                            const mes = parseInt(document.getElementById('currentMonth').value);
+                            const year = parseInt(document.getElementById('currentYear').value);
+                            const monthKey = `${year}-${String(mes).padStart(2, '0')}`;
+                            
+                            if (!monthlyChanges[monthKey]) {
+                                monthlyChanges[monthKey] = [];
+                            }
+                            
+                            monthlyChanges[monthKey].push({
+                                tipo: 'REINSTALACION',
+                                codigo: panel.codigo,
+                                municipio: panel.municipio,
+                                fecha: fecha,
+                                nuevoMunicipio: nuevoMunicipio,
+                                timestamp: new Date().toISOString()
+                            });
+                            
+                            localStorage.setItem(CHANGES_KEY, JSON.stringify(monthlyChanges));
+                        }
+
+                        showToast(`✅ Panel reinstalado exitosamente\n\nCódigo: ${panelSeleccionadoReinstalacion.codigo}\nFecha: ${new Date(fecha).toLocaleDateString('es-ES')}${cambioMunicipio ? `\nNuevo municipio: ${nuevoMunicipio}` : ''}`, 'success');
                     }
 
-                    // Registrar cambio
-                    const mes = parseInt(document.getElementById('currentMonth').value);
-                    const year = parseInt(document.getElementById('currentYear').value);
-                    const monthKey = `${year}-${String(mes).padStart(2, '0')}`;
-                    
-                    if (!monthlyChanges[monthKey]) {
-                        monthlyChanges[monthKey] = [];
-                    }
-                    
-                    monthlyChanges[monthKey].push({
-                        tipo: 'REINSTALACION',
-                        codigo: panel.codigo,
-                        municipio: panel.municipio,
-                        municipioAnterior: cambioMunicipio ? panelSeleccionadoReinstalacion.municipio : null,
-                        fecha: fecha,
-                        timestamp: new Date().toISOString()
-                    });
-                    
-                    localStorage.setItem(CHANGES_KEY, JSON.stringify(monthlyChanges));
-                    
                     // Actualizar interfaz
                     updateTable();
-                    actualizarDashboard();
-                    saveData();
+                    await actualizarDashboard();
+                    if (typeof saveData === 'function') saveData();
                     
-                    alert(` Panel reinstalado exitosamente\n\nCódigo: ${panel.codigo}\nMunicipio: ${panel.municipio}`);
                     closeModal('modalReinstalacion');
+                } else {
+                    throw new Error('Error en la aplicación del cambio');
                 }
                 
             } catch (error) {
-                console.error(' Error:', error);
-                alert(` Error al reinstalar:\n\n${error.message}`);
+                console.error('❌ Error:', error);
+                showToast(`❌ Error al reinstalar:\n\n${error.message}`, 'error');
             }
         }
 
@@ -3910,6 +5175,19 @@
 
         function openModalBaja() {
             const modal = document.getElementById('modalBaja');
+            
+            // Inicializar PanelPicker
+            createPanelPicker('bajaPanelPicker', {
+                onChange: (panel) => {
+                    panelSeleccionadoBaja = panel;
+                    actualizarVistaPreviewBaja();
+                },
+                onClear: () => {
+                    panelSeleccionadoBaja = null;
+                    actualizarVistaPreviewBaja();
+                }
+            });
+            
             modal.classList.remove('hidden');
             setTimeout(() => modal.classList.add('show'), 10);
             panelSeleccionadoBaja = null;
@@ -3922,7 +5200,7 @@
                 document.getElementById('bajaPanelInfo').innerHTML = `
                     <strong>${panelSeleccionadoBaja.codigo}</strong><br>
                     <span style="color: #64748B; font-size: 13px;">
-                        ${panelSeleccionadoBaja.municipio}  Tarifa: ${(panelSeleccionadoBaja.tarifa || 37.70).toFixed(2)} €/mes
+                        ${panelSeleccionadoBaja.municipio}  Tarifa: ${formatEuro(panelSeleccionadoBaja.tarifa || 37.70)}/mes
                     </span>
                 `;
                 
@@ -3930,14 +5208,42 @@
                 document.getElementById('bajaBuscar').value = panelSeleccionadoBaja.codigo;
                 
                 // Actualizar preview
-                document.getElementById('bajaFacturacionActual').textContent = `${(panelSeleccionadoBaja.tarifa || 37.70).toFixed(2)} €`;
-                document.getElementById('bajaPerdida').textContent = `${(panelSeleccionadoBaja.tarifa || 37.70).toFixed(2)} €`;
+                document.getElementById('bajaFacturacionActual').textContent = formatEuro(panelSeleccionadoBaja.tarifa || 37.70);
+                document.getElementById('bajaPerdida').textContent = formatEuro(panelSeleccionadoBaja.tarifa || 37.70);
+            }
+        }
+
+        function actualizarVistaPreviewBaja() {
+            const panelInfo = document.getElementById('bajaPanelInfo');
+            const facturacionActualEl = document.getElementById('bajaFacturacionActual');
+            const perdidaEl = document.getElementById('bajaPerdida');
+            
+            if (!panelInfo || !facturacionActualEl || !perdidaEl) {
+                console.warn('⚠️ Elementos del modal de baja no encontrados');
+                return;
+            }
+            
+            if (panelSeleccionadoBaja) {
+                panelInfo.innerHTML = `
+                    <strong>${panelSeleccionadoBaja.codigo}</strong><br>
+                    <span style="color: #64748B; font-size: 13px;">
+                        ${panelSeleccionadoBaja.municipio} — Tarifa: ${formatearImporteEuro(panelSeleccionadoBaja.tarifa || 37.70)}/mes
+                    </span>
+                `;
+                
+                // Actualizar preview de facturación
+                facturacionActualEl.textContent = formatearImporteEuro(panelSeleccionadoBaja.tarifa || 37.70);
+                perdidaEl.textContent = formatearImporteEuro(panelSeleccionadoBaja.tarifa || 37.70);
+            } else {
+                panelInfo.innerHTML = 'Ningún panel seleccionado';
+                facturacionActualEl.textContent = '-';
+                perdidaEl.textContent = '-';
             }
         }
 
         async function guardarBaja() {
             if (!panelSeleccionadoBaja) {
-                alert('ï Por favor selecciona un panel');
+                showToast('❌ Por favor selecciona un panel', 'error');
                 return;
             }
 
@@ -3945,52 +5251,88 @@
             const confirmacion = document.getElementById('bajaConfirmacion').checked;
 
             if (!motivo) {
-                alert('ï Por favor selecciona el motivo de la baja');
+                showToast('❌ Por favor selecciona el motivo de la baja', 'error');
                 return;
             }
 
             if (!confirmacion) {
-                alert('ï Debes confirmar la baja definitiva del panel');
+                showToast('❌ Debes confirmar la baja definitiva del panel', 'error');
                 return;
             }
 
             try {
-                // Eliminar panel de panelsData
-                const index = panelsData.findIndex(p => p.codigo === panelSeleccionadoBaja.codigo);
-                if (index !== -1) {
-                    panelsData.splice(index, 1);
+                // Obtener usuario actual
+                const user = firebase.auth().currentUser;
+                if (!user) {
+                    throw new Error('Usuario no autenticado');
+                }
 
-                    // Registrar cambio
-                    const mes = parseInt(document.getElementById('currentMonth').value);
-                    const year = parseInt(document.getElementById('currentYear').value);
-                    const monthKey = `${year}-${String(mes).padStart(2, '0')}`;
-                    
-                    if (!monthlyChanges[monthKey]) {
-                        monthlyChanges[monthKey] = [];
+                showToast('Aplicando baja definitiva...', 'info');
+
+                // Aplicar cambio usando BillingService
+                const payload = {
+                    action: BillingService.CHANGE_ACTIONS.BAJA_DEFINITIVA,
+                    effectiveDate: new Date().toISOString().split('T')[0], // Fecha actual
+                    motivo: motivo,
+                    tarifaBaseMes: panelSeleccionadoBaja.tarifa || BillingService.TARIFA_BASE_2025,
+                    uid: user.uid,
+                    email: user.email
+                };
+
+                const result = await BillingService.applyChange(
+                    panelSeleccionadoBaja.codigo,
+                    payload
+                );
+
+                if (result.success) {
+                    if (result.duplicate) {
+                        showToast('Baja ya aplicada anteriormente', 'warning');
+                    } else {
+                        // Actualizar datos locales - marcar como BAJA en lugar de eliminar
+                        const panel = panelsData.find(p => p.codigo === panelSeleccionadoBaja.codigo);
+                        if (panel) {
+                            panel.estadoActual = BillingService.PANEL_STATES.BAJA;
+                            panel.fechaBaja = new Date().toISOString().split('T')[0];
+                            panel.motivoBaja = motivo;
+                        }
+
+                        // Registrar cambio en el sistema legacy si existe
+                        if (typeof monthlyChanges !== 'undefined') {
+                            const mes = parseInt(document.getElementById('currentMonth').value);
+                            const year = parseInt(document.getElementById('currentYear').value);
+                            const monthKey = `${year}-${String(mes).padStart(2, '0')}`;
+                            
+                            if (!monthlyChanges[monthKey]) {
+                                monthlyChanges[monthKey] = [];
+                            }
+                            
+                            monthlyChanges[monthKey].push({
+                                tipo: 'BAJA',
+                                codigo: panelSeleccionadoBaja.codigo,
+                                municipio: panelSeleccionadoBaja.municipio,
+                                motivo: motivo,
+                                timestamp: new Date().toISOString()
+                            });
+                            
+                            localStorage.setItem(CHANGES_KEY, JSON.stringify(monthlyChanges));
+                        }
+
+                        showToast(`✅ Panel dado de baja exitosamente\n\nCódigo: ${panelSeleccionadoBaja.codigo}\nMotivo: ${motivo}`, 'success');
                     }
-                    
-                    monthlyChanges[monthKey].push({
-                        tipo: 'BAJA',
-                        codigo: panelSeleccionadoBaja.codigo,
-                        municipio: panelSeleccionadoBaja.municipio,
-                        motivo: motivo,
-                        timestamp: new Date().toISOString()
-                    });
-                    
-                    localStorage.setItem(CHANGES_KEY, JSON.stringify(monthlyChanges));
-                    
+
                     // Actualizar interfaz
                     updateTable();
-                    actualizarDashboard();
-                    saveData();
+                    await actualizarDashboard();
+                    if (typeof saveData === 'function') saveData();
                     
-                    alert(` Panel dado de baja exitosamente\n\nCódigo: ${panelSeleccionadoBaja.codigo}\nMotivo: ${motivo}`);
                     closeModal('modalBaja');
+                } else {
+                    throw new Error('Error en la aplicación del cambio');
                 }
                 
             } catch (error) {
-                console.error(' Error:', error);
-                alert(` Error al dar de baja:\n\n${error.message}`);
+                console.error('❌ Error:', error);
+                showToast(`❌ Error al dar de baja:\n\n${error.message}`, 'error');
             }
         }
 
@@ -4007,6 +5349,18 @@
             // Establecer fecha actual
             const today = new Date().toISOString().split('T')[0];
             inputFecha.value = today;
+            
+            // Inicializar PanelPicker
+            createPanelPicker('desmontajePanelPicker', {
+                onChange: (panel) => {
+                    panelSeleccionadoDesmontaje = panel;
+                    actualizarVistaPreviewDesmontaje();
+                },
+                onClear: () => {
+                    panelSeleccionadoDesmontaje = null;
+                    actualizarVistaPreviewDesmontaje();
+                }
+            });
             
             modal.classList.remove('hidden');
             setTimeout(() => modal.classList.add('show'), 10);
@@ -4031,33 +5385,90 @@
             }
         }
 
-        function actualizarVistaPreviewDesmontaje() {
-            if (!panelSeleccionadoDesmontaje) return;
-
-            const fecha = document.getElementById('desmontajeFecha').value;
-            if (!fecha) return;
-
-            const fechaDesmontaje = new Date(fecha);
-            const mes = parseInt(document.getElementById('currentMonth').value);
-            const year = parseInt(document.getElementById('currentYear').value);
+        async function actualizarVistaPreviewDesmontaje() {
+            // Verificar que los elementos existen antes de usarlos
+            const diasElement = document.getElementById('desmontajeDias');
+            const totalElement = document.getElementById('desmontagTotal');
+            const ahorroElement = document.getElementById('desmontagAhorro');
             
-            let diasActivos = 30;
-            if (fechaDesmontaje.getMonth() + 1 === mes && fechaDesmontaje.getFullYear() === year) {
-                diasActivos = fechaDesmontaje.getDate();
+            if (!diasElement || !totalElement || !ahorroElement) {
+                console.warn('⚠️ Elementos del modal de desmontaje no encontrados');
+                return;
             }
 
-            const tarifaDiaria = (panelSeleccionadoDesmontaje.tarifa || 37.70) / 30;
-            const facturacionAjustada = diasActivos * tarifaDiaria;
-            const ahorro = ((panelSeleccionadoDesmontaje.tarifa || 37.70) - facturacionAjustada);
+            if (!panelSeleccionadoDesmontaje) {
+                // Limpiar campos si no hay panel seleccionado
+                diasElement.textContent = '-';
+                totalElement.textContent = '-';
+                ahorroElement.textContent = '-';
+                return;
+            }
 
-            document.getElementById('desmontajeDias').textContent = `${diasActivos} días`;
-            document.getElementById('desmontagTotal').textContent = `${facturacionAjustada.toFixed(2)} €`;
-            document.getElementById('desmontagAhorro').textContent = `${ahorro.toFixed(2)} €`;
+            const fechaElement = document.getElementById('desmontajeFecha');
+            const fecha = fechaElement ? fechaElement.value : '';
+            
+            if (!fecha) {
+                diasElement.textContent = '-';
+                totalElement.textContent = '-';
+                ahorroElement.textContent = '-';
+                return;
+            }
+
+            try {
+                // Usar BillingService para previsualización
+                const preview = await BillingService.previewChange(
+                    panelSeleccionadoDesmontaje.codigo,
+                    BillingService.CHANGE_ACTIONS.DESMONTAJE_TEMPORAL,
+                    fecha
+                );
+
+                if (preview.valid) {
+                    const { diasFacturables, importeAFacturar, importeNoFacturado, estadoActual, estadoFuturo } = preview.preview;
+                    
+                    diasElement.textContent = `${diasFacturables} días`;
+                    totalElement.textContent = formatearImporteEuro(importeAFacturar);
+                    ahorroElement.textContent = formatearImporteEuro(importeNoFacturado);
+                    
+                    // Mostrar información de estado
+                    console.log('📊 Previsualización Desmontaje (BillingService):', {
+                        panel: panelSeleccionadoDesmontaje.codigo,
+                        fecha,
+                        estadoActual,
+                        estadoFuturo,
+                        diasFacturables,
+                        importeAFacturar,
+                        importeNoFacturado
+                    });
+                } else {
+                    // Mostrar error de validación
+                    diasElement.textContent = 'Error';
+                    totalElement.textContent = 'Error';
+                    ahorroElement.textContent = 'Error';
+                    
+                    console.error('❌ Error en previsualización:', preview.error);
+                    
+                    // Mostrar toast de error
+                    showToast(`Error: ${preview.error}`, 'error');
+                }
+                
+            } catch (error) {
+                console.error('❌ Error obteniendo previsualización:', error);
+                
+                // Fallback al cálculo anterior si BillingService falla
+                const tarifaBase = panelSeleccionadoDesmontaje.tarifa || 37.70;
+                const calculo = calcularFacturacionAjustada(null, fecha, tarifaBase);
+
+                diasElement.textContent = `${calculo.diasActivos} días`;
+                totalElement.textContent = formatearImporteEuro(calculo.facturacionAjustada);
+                ahorroElement.textContent = formatearImporteEuro(calculo.ahorro);
+                
+                showToast('Usando cálculo local (sin Firestore)', 'warning');
+            }
         }
 
         async function guardarDesmontaje() {
             if (!panelSeleccionadoDesmontaje) {
-                alert('ï Por favor selecciona un panel');
+                alert('❌ Por favor selecciona un panel');
                 return;
             }
 
@@ -4065,53 +5476,88 @@
             const motivo = document.getElementById('desmontagMotivo').value;
 
             if (!fecha) {
-                alert('ï Por favor selecciona una fecha de desmontaje');
+                alert('❌ Por favor selecciona una fecha de desmontaje');
                 return;
             }
 
             if (!motivo) {
-                alert('ï Por favor selecciona el motivo del desmontaje');
+                alert('❌ Por favor selecciona el motivo del desmontaje');
                 return;
             }
 
             try {
-                // Actualizar panel
-                const panel = panelsData.find(p => p.codigo === panelSeleccionadoDesmontaje.codigo);
-                if (panel) {
-                    panel.fechaDesmontaje = fecha;
+                // Obtener usuario actual
+                const user = firebase.auth().currentUser;
+                if (!user) {
+                    throw new Error('Usuario no autenticado');
+                }
 
-                    // Registrar cambio
-                    const mes = parseInt(document.getElementById('currentMonth').value);
-                    const year = parseInt(document.getElementById('currentYear').value);
-                    const monthKey = `${year}-${String(mes).padStart(2, '0')}`;
-                    
-                    if (!monthlyChanges[monthKey]) {
-                        monthlyChanges[monthKey] = [];
+                // Aplicar cambio usando BillingService
+                const payload = {
+                    action: BillingService.CHANGE_ACTIONS.DESMONTAJE_TEMPORAL,
+                    effectiveDate: fecha,
+                    motivo: motivo,
+                    tarifaBaseMes: panelSeleccionadoDesmontaje.tarifa || BillingService.TARIFA_BASE_2025,
+                    uid: user.uid,
+                    email: user.email
+                };
+
+                showToast('Aplicando desmontaje...', 'info');
+
+                const result = await BillingService.applyChange(
+                    panelSeleccionadoDesmontaje.codigo,
+                    payload
+                );
+
+                if (result.success) {
+                    if (result.duplicate) {
+                        showToast('Desmontaje ya aplicado anteriormente', 'warning');
+                    } else {
+                        // Actualizar datos locales si existe el panel en panelsData
+                        const panel = panelsData.find(p => p.codigo === panelSeleccionadoDesmontaje.codigo);
+                        if (panel) {
+                            panel.fechaDesmontaje = fecha;
+                            panel.estadoActual = BillingService.PANEL_STATES.DESMONTADO;
+                        }
+
+                        // Registrar cambio en el sistema legacy si existe
+                        if (typeof monthlyChanges !== 'undefined') {
+                            const mes = parseInt(document.getElementById('currentMonth').value);
+                            const year = parseInt(document.getElementById('currentYear').value);
+                            const monthKey = `${year}-${String(mes).padStart(2, '0')}`;
+                            
+                            if (!monthlyChanges[monthKey]) {
+                                monthlyChanges[monthKey] = [];
+                            }
+                            
+                            monthlyChanges[monthKey].push({
+                                tipo: 'DESMONTAJE',
+                                codigo: panel.codigo,
+                                municipio: panel.municipio,
+                                fecha: fecha,
+                                motivo: motivo,
+                                timestamp: new Date().toISOString()
+                            });
+                            
+                            localStorage.setItem(CHANGES_KEY, JSON.stringify(monthlyChanges));
+                        }
+
+                        showToast(`✅ Panel desmontado exitosamente\n\nCódigo: ${panelSeleccionadoDesmontaje.codigo}\nFecha: ${new Date(fecha).toLocaleDateString('es-ES')}`, 'success');
                     }
-                    
-                    monthlyChanges[monthKey].push({
-                        tipo: 'DESMONTAJE',
-                        codigo: panel.codigo,
-                        municipio: panel.municipio,
-                        fecha: fecha,
-                        motivo: motivo,
-                        timestamp: new Date().toISOString()
-                    });
-                    
-                    localStorage.setItem(CHANGES_KEY, JSON.stringify(monthlyChanges));
-                    
+
                     // Actualizar interfaz
                     updateTable();
-                    actualizarDashboard();
-                    saveData();
+                    await actualizarDashboard();
+                    if (typeof saveData === 'function') saveData();
                     
-                    alert(` Panel desmontado exitosamente\n\nCódigo: ${panel.codigo}\nFecha: ${new Date(fecha).toLocaleDateString('es-ES')}`);
                     closeModal('modalDesmontaje');
+                } else {
+                    throw new Error('Error en la aplicación del cambio');
                 }
                 
             } catch (error) {
-                console.error(' Error:', error);
-                alert(` Error al desmontar:\n\n${error.message}`);
+                console.error('❌ Error:', error);
+                showToast(`❌ Error al desmontar:\n\n${error.message}`, 'error');
             }
         }
 
@@ -4123,6 +5569,19 @@
 
         function openModalCambioTarifa() {
             const modal = document.getElementById('modalCambioTarifa');
+            
+            // Inicializar PanelPicker
+            createPanelPicker('tarifaPanelPicker', {
+                onChange: (panel) => {
+                    panelSeleccionadoTarifa = panel;
+                    actualizarVistaPreviewTarifa();
+                },
+                onClear: () => {
+                    panelSeleccionadoTarifa = null;
+                    actualizarVistaPreviewTarifa();
+                }
+            });
+            
             modal.classList.remove('hidden');
             setTimeout(() => modal.classList.add('show'), 10);
             panelSeleccionadoTarifa = null;
@@ -4142,22 +5601,33 @@
                 document.getElementById('tarifaResults').classList.remove('show');
                 document.getElementById('tarifaBuscar').value = panelSeleccionadoTarifa.codigo;
                 
-                document.getElementById('tarifaActual').textContent = `${(panelSeleccionadoTarifa.tarifa || 37.70).toFixed(2)} €`;
+                document.getElementById('tarifaActual').textContent = formatearImporteEuro(panelSeleccionadoTarifa.tarifa || 37.70);
             }
         }
 
         function actualizarVistaPreviewTarifa() {
-            const nuevaTarifa = parseFloat(document.getElementById('tarifaNueva').value);
+            // Verificar que los elementos existen
+            const nuevaTarifaEl = document.getElementById('tarifaNueva');
+            const nuevaTarifaPreviewEl = document.getElementById('tarifaNuevaPreview');
+            const panelesAfectadosEl = document.getElementById('tarifaPanelesAfectados');
+            const variacionEl = document.getElementById('tarifaVariacion');
+            
+            if (!nuevaTarifaEl || !nuevaTarifaPreviewEl || !panelesAfectadosEl || !variacionEl) {
+                console.warn('⚠️ Elementos del modal de cambio de tarifa no encontrados');
+                return;
+            }
+            
+            const nuevaTarifa = parseFloat(nuevaTarifaEl.value);
             const alcance = document.querySelector('input[name="tarifaAlcance"]:checked')?.value;
             
             if (!nuevaTarifa || isNaN(nuevaTarifa)) {
-                document.getElementById('tarifaNuevaPreview').textContent = '-';
-                document.getElementById('tarifaPanelesAfectados').textContent = '-';
-                document.getElementById('tarifaVariacion').textContent = '-';
+                nuevaTarifaPreviewEl.textContent = '-';
+                panelesAfectadosEl.textContent = '-';
+                variacionEl.textContent = '-';
                 return;
             }
 
-            document.getElementById('tarifaNuevaPreview').textContent = `${nuevaTarifa.toFixed(2)} €`;
+            nuevaTarifaPreviewEl.textContent = formatearImporteEuro(nuevaTarifa);
 
             let panelesAfectados = 0;
             let variacion = 0;
@@ -4178,12 +5648,12 @@
                 });
             }
 
-            document.getElementById('tarifaPanelesAfectados').textContent = panelesAfectados;
+            panelesAfectadosEl.textContent = panelesAfectados;
             
             const variacionColor = variacion >= 0 ? '#16A34A' : '#DC2626';
             const variacionSigno = variacion >= 0 ? '+' : '';
-            document.getElementById('tarifaVariacion').innerHTML = 
-                `<span style="color: ${variacionColor};">${variacionSigno}${variacion.toFixed(2)} €</span>`;
+            variacionEl.innerHTML = 
+                `<span style="color: ${variacionColor};">${variacionSigno}${formatearImporteEuro(Math.abs(variacion))}</span>`;
         }
 
         async function guardarCambioTarifa() {
@@ -4250,7 +5720,7 @@
                 
                 // Actualizar interfaz
                 updateTable();
-                actualizarDashboard();
+                await actualizarDashboard();
                 saveData();
                 
                 alert(` Tarifa actualizada exitosamente\n\nPaneles afectados: ${panelesModificados.length}\nNueva tarifa: ${nuevaTarifa.toFixed(2)} €`);
@@ -4297,10 +5767,23 @@
             document.getElementById('currentYear').addEventListener('change', updateTable);
             document.getElementById('baseRate').addEventListener('change', updateTable);
             
+            // Event listeners para los filtros
+            document.getElementById('searchInput')?.addEventListener('input', applyFilters);
+            document.getElementById('filterMunicipio')?.addEventListener('change', applyFilters);
+            document.getElementById('filterEstado')?.addEventListener('change', applyFilters);
+            document.getElementById('filterFacturacion')?.addEventListener('change', applyFilters);
+            
+            // Event listener para el botón de limpiar filtros
+            document.getElementById('clearFiltersBtn')?.addEventListener('click', clearFilters);
+            
             // Event listeners para vista previa en tiempo real
             const altaFecha = document.getElementById('altaFecha');
+            const altaCodigo = document.getElementById('altaCodigo');
             if (altaFecha) {
                 altaFecha.addEventListener('change', actualizarVistaPreviewAlta);
+            }
+            if (altaCodigo) {
+                altaCodigo.addEventListener('input', actualizarVistaPreviewAlta);
             }
 
             const desmontajeFecha = document.getElementById('desmontajeFecha');
@@ -4326,6 +5809,40 @@
                 });
             }
         });
+        
+        // ===== FUNCIÓN DE MIGRACIÓN DE BILLING SUMMARY =====
+        
+        /**
+         * Ejecuta la migración para reconstruir billing_summary
+         */
+        window.executeBillingSummaryMigration = async function(monthKey = null) {
+            try {
+                if (!window.BillingService) {
+                    throw new Error('BillingService no está cargado');
+                }
+                
+                showToast('🔄 Iniciando migración de billing_summary...', 'info');
+                
+                const result = await BillingService.migrateBillingSummary(monthKey);
+                
+                showToast(`✅ Migración completada:\n\n${result.totalPanelesFacturables} paneles activos\n${formatEuro(result.totalImporteMes)} facturación total`, 'success');
+                
+                // Actualizar dashboard con los nuevos datos
+                await actualizarDashboard();
+                
+                return result;
+                
+            } catch (error) {
+                console.error('❌ Error en migración:', error);
+                showToast(`❌ Error en migración:\n\n${error.message}`, 'error');
+                throw error;
+            }
+        };
+        
+        // Para ejecutar la migración desde la consola del navegador:
+        // executeBillingSummaryMigration() - migra el mes actual
+        // executeBillingSummaryMigration('202410') - migra octubre 2024
+        
     </script>
 
         <!-- ============================================
