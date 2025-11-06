@@ -1,3 +1,13 @@
+const db = window.firebaseDB;
+// Activar logs de Firestore para diagnóstico profundo (se puede desactivar después)
+try {
+    if (window.firebase && firebase.firestore && typeof firebase.firestore.setLogLevel === 'function') {
+        firebase.firestore.setLogLevel('debug');
+        console.log('🧪 Firestore log level: debug');
+    }
+} catch (e) {
+    console.warn('⚠️ No se pudo activar log de Firestore:', e);
+}
 /**
  * 🧮 BILLING SERVICE - Sistema Integral de Gestión de Facturación
  * 
@@ -58,6 +68,15 @@ function getDayOfMonth(date) {
     return new Date(date).getDate();
 }
 
+/**
+ * Suma días a una fecha y retorna en formato ISO
+ */
+function addDays(dateISO, days) {
+    const date = new Date(dateISO + 'T00:00:00');
+    date.setDate(date.getDate() + days);
+    return formatDateISO(date);
+}
+
 // ===== FUNCIONES DE CÁLCULO =====
 /**
  * Calcula días facturables según reglas de negocio
@@ -113,6 +132,8 @@ function validateStateTransition(currentState, action) {
 
 /**
  * Valida solapamientos en rangos efectivos
+ * Los rangos son inclusivos: [from, to]
+ * Con la lógica de transiciones, los rangos son adyacentes pero no se solapan
  */
 function validateDateRanges(effectiveRanges, newDate, action) {
     // Convertir fecha a formato comparable
@@ -124,16 +145,18 @@ function validateDateRanges(effectiveRanges, newDate, action) {
         
         // Verificar solapamientos
         if (rangeEnd === null) {
-            // Rango activo - verificar si la nueva fecha es posterior
-            if (newDateISO <= rangeStart && action !== CHANGE_ACTIONS.BAJA_DEFINITIVA) {
+            // Rango activo - la nueva fecha debe ser posterior o igual al inicio
+            if (newDateISO < rangeStart && action !== CHANGE_ACTIONS.BAJA_DEFINITIVA) {
                 return {
                     valid: false,
                     error: `Fecha ${newDateISO} anterior al inicio del rango activo ${rangeStart}`
                 };
             }
         } else {
-            // Rango cerrado - verificar si hay solapamiento
-            if (newDateISO >= rangeStart && newDateISO <= rangeEnd) {
+            // Rango cerrado - verificar si hay solapamiento estricto
+            // Con la nueva lógica, los rangos adyacentes comparten fecha de frontera
+            // pero el nuevo rango empieza al día siguiente
+            if (newDateISO > rangeStart && newDateISO < rangeEnd) {
                 return {
                     valid: false,
                     error: `Fecha ${newDateISO} solapa con rango existente ${rangeStart} - ${rangeEnd}`
@@ -152,12 +175,55 @@ function validateDateRanges(effectiveRanges, newDate, action) {
  */
 async function getPanelEffectiveState(panelId, date) {
     try {
-        console.log(`🔍 Obteniendo estado efectivo para panel ${panelId} en fecha ${formatDateISO(date)}`);
-        
-        // Obtener datos del panel desde Firestore
-        const panelDoc = await db.collection('panels').doc(panelId).get();
-        
-        if (!panelDoc.exists) {
+        console.log(`🔍 Obteniendo estado efectivo para panel ${panelId} (tipo: ${typeof panelId}) en fecha ${formatDateISO(date)}`);
+
+        // Normalizar id en ambos formatos
+        const panelIdStr = String(panelId).trim();
+        const panelIdNum = !isNaN(Number(panelIdStr)) ? Number(panelIdStr) : null;
+
+        // 1º intento: buscar por codigo como string
+        let panelQuery = await db.collection('paneles')
+            .where('codigo', '==', panelIdStr)
+            .limit(1)
+            .get();
+        console.log(`🔍 Query (string) resultado: ${panelQuery.empty ? 'VACÍO' : 'ENCONTRADO'}, docs: ${panelQuery.size}`);
+
+        // 2º intento (fallback): si vacío y es numérico, buscar por número
+        if (panelQuery.empty && panelIdNum !== null) {
+            console.log('🔁 Fallback búsqueda numérica...');
+            panelQuery = await db.collection('paneles')
+                .where('codigo', '==', panelIdNum)
+                .limit(1)
+                .get();
+            console.log(`🔍 Query (number) resultado: ${panelQuery.empty ? 'VACÍO' : 'ENCONTRADO'}, docs: ${panelQuery.size}`);
+        }
+
+        if (panelQuery.empty) {
+            // Fallback legacy desde dataset en memoria
+            const legacyPanel = (window.panelsData || []).find(p => String(p.codigo).trim() === panelIdStr);
+            if (legacyPanel) {
+                console.log(`🗂️ Fallback legacy en memoria para panel ${panelIdStr}`);
+                // Determinar estado base por fechaDesmontaje / fechaBaja hipotética
+                let estadoBase = PANEL_STATES.ACTIVO;
+                if (legacyPanel.fechaBaja) {
+                    estadoBase = PANEL_STATES.BAJA;
+                } else if (legacyPanel.fechaDesmontaje) {
+                    estadoBase = PANEL_STATES.DESMONTADO;
+                }
+                return {
+                    exists: true,
+                    state: estadoBase,
+                    tarifa: TARIFA_BASE_2025,
+                    isLegacy: true,
+                    legacyData: {
+                        fechaDesmontaje: legacyPanel.fechaDesmontaje || null,
+                        fechaBaja: legacyPanel.fechaBaja || null,
+                        municipio: legacyPanel.municipio || null
+                    },
+                    docId: null // Aún no existe en Firestore
+                };
+            }
+            console.log(`❌ Panel ${panelIdStr} NO encontrado en base de datos (string y/o number) y no existe en memoria`);
             return {
                 exists: false,
                 state: null,
@@ -165,8 +231,11 @@ async function getPanelEffectiveState(panelId, date) {
             };
         }
         
+        const panelDoc = panelQuery.docs[0];
         const panelData = panelDoc.data();
         const targetDate = formatDateISO(date);
+        
+        console.log(`📄 Panel encontrado - codigo: ${panelData.codigo}, estadoActual: ${panelData.estadoActual}, effectiveRanges: ${panelData.effectiveRanges ? panelData.effectiveRanges.length : 0}`);
         
         // Buscar en rangos efectivos
         const effectiveRanges = panelData.effectiveRanges || [];
@@ -180,12 +249,54 @@ async function getPanelEffectiveState(panelId, date) {
                     exists: true,
                     state: range.estado,
                     tarifa: panelData.tarifaBaseMes || TARIFA_BASE_2025,
-                    range: range
+                    range: range,
+                    docId: panelDoc.id // Incluir ID real del documento
                 };
             }
         }
         
-        // Si no se encuentra en rangos, el panel no existía en esa fecha
+        // ===== SOPORTE PARA PANELES LEGACY =====
+        // Si no hay rangos efectivos pero el panel existe en Firestore,
+        // es un panel legacy que necesita estado base calculado
+        if (effectiveRanges.length === 0) {
+            console.log(`⚠️ Panel legacy detectado: ${panelId} - calculando estado base`);
+            
+            // Determinar estado base desde campos antiguos
+            let estadoBase = PANEL_STATES.ACTIVO; // Por defecto ACTIVO
+            
+            if (panelData.fechaBaja) {
+                estadoBase = PANEL_STATES.BAJA;
+            } else if (panelData.fechaDesmontaje) {
+                estadoBase = PANEL_STATES.DESMONTADO;
+            } else if (panelData.estado) {
+                // Usar campo estado si existe
+                const estadoLegacy = panelData.estado.toUpperCase();
+                if (estadoLegacy === 'DESMONTADO') {
+                    estadoBase = PANEL_STATES.DESMONTADO;
+                } else if (estadoLegacy === 'BAJA') {
+                    estadoBase = PANEL_STATES.BAJA;
+                } else {
+                    estadoBase = PANEL_STATES.ACTIVO;
+                }
+            }
+            
+            console.log(`📋 Estado base calculado para panel legacy ${panelId}: ${estadoBase}`);
+            
+            return {
+                exists: true,
+                state: estadoBase,
+                tarifa: panelData.tarifaBaseMes || panelData.tarifa || TARIFA_BASE_2025,
+                isLegacy: true, // Marcar como legacy
+                legacyData: {
+                    fechaDesmontaje: panelData.fechaDesmontaje,
+                    fechaBaja: panelData.fechaBaja,
+                    estado: panelData.estado
+                },
+                docId: panelDoc.id // Incluir ID real del documento
+            };
+        }
+        
+        // Si no se encuentra en rangos y no es legacy, el panel no existía en esa fecha
         return {
             exists: false,
             state: null,
@@ -227,10 +338,32 @@ async function previewChange(panelId, action, effectiveDate, payload = {}) {
         let importeAFacturar = 0;
         
         // Obtener cambios existentes en el mes para calcular días
-        const changesQuery = await db.collection('panels').doc(panelId)
-            .collection('changes')
-            .where('monthKey', '==', monthKey)
+        // Primero buscar el panel por código (string y fallback numérico)
+        const panelIdStr = String(panelId).trim();
+        const panelIdNum = !isNaN(Number(panelIdStr)) ? Number(panelIdStr) : null;
+
+        let panelQuery = await db.collection('paneles')
+            .where('codigo', '==', panelIdStr)
+            .limit(1)
             .get();
+        if (panelQuery.empty && panelIdNum !== null) {
+            panelQuery = await db.collection('paneles')
+                .where('codigo', '==', panelIdNum)
+                .limit(1)
+                .get();
+        }
+        
+        let changesQuery;
+        if (!panelQuery.empty) {
+            const panelDoc = panelQuery.docs[0];
+            changesQuery = await panelDoc.ref
+                .collection('changes')
+                .where('monthKey', '==', monthKey)
+                .get();
+        } else {
+            // Si el panel no existe, no hay cambios previos
+            changesQuery = { empty: true, forEach: () => {} };
+        }
         
         const existingChanges = [];
         changesQuery.forEach(doc => {
@@ -294,18 +427,125 @@ async function previewChange(panelId, action, effectiveDate, payload = {}) {
  */
 async function applyChange(panelId, payload) {
     try {
-        console.log(`🔄 Aplicando cambio para panel ${panelId}:`, payload);
+        console.log(`🔄 Aplicando cambio para panel ${panelId} (tipo: ${typeof panelId}):`, payload);
         
-        const { action, effectiveDate, motivo, tarifaBaseMes, uid, email } = payload;
+        // ✅ LIMPIAR COMPLETAMENTE EL INPUT - Crear objeto nuevo sin contaminar
+        const cleanPayload = {
+            action: String(payload.action || ''),
+            effectiveDate: String(payload.effectiveDate || ''),
+            motivo: payload.motivo ? String(payload.motivo) : null,
+            tarifaBaseMes: payload.tarifaBaseMes ? Number(payload.tarifaBaseMes) : null,
+            uid: String(payload.uid || ''),
+            email: String(payload.email || '')
+        };
         
-        // Generar clave de idempotencia
-        const idempotencyKey = generateIdempotencyKey(panelId, action, effectiveDate);
+        const { action, effectiveDate, motivo, tarifaBaseMes, uid, email } = cleanPayload;
+        
+        // Asegurar que panelId es string
+        const panelIdStr = String(panelId).trim();
+        const panelIdNum = !isNaN(Number(panelIdStr)) ? Number(panelIdStr) : null;
+        console.log(`🔄 Panel ID normalizado a string: "${panelIdStr}"`);
+        
+    // Generar clave de idempotencia
+    const idempotencyKey = generateIdempotencyKey(panelIdStr, action, effectiveDate);
+    console.log('🧪 DEBUG: idempotencyKey generado:', idempotencyKey);
+
+        // ✅ Buscar el documento del panel POR FUERA de la transacción para obtener un DocumentReference
+        console.log('🔍 Lookup de panel por código (pre-transacción):', panelIdStr);
+        let panelDocRef = null;
+        let preTxPanelSnapshot = null;
+        try {
+            let preQuery = await db.collection('paneles')
+                .where('codigo', '==', panelIdStr)
+                .limit(1)
+                .get();
+            if (preQuery.empty && panelIdNum !== null) {
+                console.log('🔁 Fallback búsqueda numérica pre-transacción...');
+                preQuery = await db.collection('paneles')
+                    .where('codigo', '==', panelIdNum)
+                    .limit(1)
+                    .get();
+            }
+            if (!preQuery.empty) {
+                preTxPanelSnapshot = preQuery.docs[0];
+                panelDocRef = preTxPanelSnapshot.ref;
+                console.log(`✅ Panel encontrado pre-transacción con docId: ${panelDocRef.id}`);
+            } else {
+                panelDocRef = db.collection('paneles').doc();
+                console.log(`🆕 Panel no encontrado pre-transacción, se creará nuevo docId: ${panelDocRef.id}`);
+            }
+        } catch (lookupErr) {
+            console.error('❌ Error en lookup pre-transacción:', lookupErr);
+            throw lookupErr;
+        }
         
         // Ejecutar transacción
         const result = await db.runTransaction(async (transaction) => {
-            // 1. Verificar idempotencia
-            const changeDoc = db.collection('panels').doc(panelId)
-                .collection('changes').doc(idempotencyKey);
+            let __step = 'tx:start';
+            try {
+                console.log('🧪 DEBUG TX:', __step);
+                // 1. Obtener el snapshot del documento del panel usando SOLO DocumentReference
+                __step = 'tx:get:panelDoc';
+                const panelSnapshot = await transaction.get(panelDocRef);
+                let panelDoc = panelDocRef;
+                let currentData;
+
+                if (!panelSnapshot.exists) {
+                    console.log(`📝 Panel ${panelIdStr} no existe (tx), inicializando como legacy antes de crear`);
+                    const legacyPanel = (window.panelsData || []).find(p => String(p.codigo).trim() === panelIdStr);
+                    let estadoBase = PANEL_STATES.ACTIVO;
+                    let municipioBase = legacyPanel ? legacyPanel.municipio || 'DESCONOCIDO' : 'DESCONOCIDO';
+                    if (legacyPanel) {
+                        if (legacyPanel.fechaBaja) {
+                            estadoBase = PANEL_STATES.BAJA;
+                        } else if (legacyPanel.fechaDesmontaje) {
+                            estadoBase = PANEL_STATES.DESMONTADO;
+                        }
+                    }
+                    const legacyStartDate = '2025-10-01';
+                    currentData = {
+                        codigo: panelIdStr,
+                        municipio: municipioBase,
+                        estadoActual: estadoBase,
+                        effectiveRanges: [{ from: legacyStartDate, to: null, estado: estadoBase }],
+                        tarifaBaseMes: TARIFA_BASE_2025,
+                        creadoLegacy: true
+                    };
+                    console.log(`✅ Panel legacy preparado para creación con estado ${estadoBase} municipio ${municipioBase}`);
+                } else {
+                    // Panel existe - usar documento encontrado
+                    const rawData = panelSnapshot.data();
+
+                    // AISLAR: Crear objeto completamente limpio sin referencias a Firestore
+                    currentData = {
+                        codigo: String(rawData.codigo || ''),
+                        municipio: String(rawData.municipio || ''),
+                        estadoActual: String(rawData.estadoActual || ''),
+                        tarifaBaseMes: Number(rawData.tarifaBaseMes || TARIFA_BASE_2025),
+                        effectiveRanges: [],
+                        estado: rawData.estado ? String(rawData.estado) : undefined,
+                        fechaBaja: rawData.fechaBaja ? (typeof rawData.fechaBaja === 'string' ? rawData.fechaBaja : (rawData.fechaBaja.toDate ? formatDateISO(rawData.fechaBaja.toDate()) : null)) : undefined,
+                        fechaDesmontaje: rawData.fechaDesmontaje ? (typeof rawData.fechaDesmontaje === 'string' ? rawData.fechaDesmontaje : (rawData.fechaDesmontaje.toDate ? formatDateISO(rawData.fechaDesmontaje.toDate()) : null)) : undefined,
+                        creadoLegacy: rawData.creadoLegacy === true
+                    };
+
+                    // Copiar effectiveRanges limpiamente
+                    if (rawData.effectiveRanges && Array.isArray(rawData.effectiveRanges)) {
+                        for (const range of rawData.effectiveRanges) {
+                            currentData.effectiveRanges.push({
+                                from: String(range.from || ''),
+                                to: range.to ? String(range.to) : null,
+                                estado: String(range.estado || '')
+                            });
+                        }
+                    }
+
+                    console.log(`✅ Panel ${panelIdStr} encontrado con ID de documento: ${panelDoc.id}`);
+                }
+            
+            // 2. Verificar idempotencia
+            __step = 'tx:get:changeDoc';
+            const changeDoc = panelDoc.collection('changes').doc(idempotencyKey);
             const existingChange = await transaction.get(changeDoc);
             
             if (existingChange.exists) {
@@ -313,16 +553,45 @@ async function applyChange(panelId, payload) {
                 return { success: true, duplicate: true, data: existingChange.data() };
             }
             
-            // 2. Obtener estado actual
-            const panelDoc = db.collection('panels').doc(panelId);
-            const panelSnapshot = await transaction.get(panelDoc);
+            // ===== REALIZAR TODAS LAS LECTURAS RESTANTES ANTES DE CUALQUIER ESCRITURA =====
             
-            const currentData = panelSnapshot.exists ? panelSnapshot.data() : {
-                codigo: panelId,
-                estadoActual: null,
-                effectiveRanges: [],
-                tarifaBaseMes: TARIFA_BASE_2025
-            };
+            // Pre-calcular monthKey para las siguientes lecturas
+            const monthKey = formatDateKey(effectiveDate);
+            
+            // Lectura 3: monthBillingDoc
+            __step = 'tx:prepare:monthBillingDoc';
+            const monthBillingDoc = db.collection('panel_month_billing')
+                .doc(`${panelIdStr}_${monthKey.replace('-', '')}`);
+
+            __step = 'tx:get:monthBillingDoc';
+            const monthBillingSnapshot = await transaction.get(monthBillingDoc);
+            
+            // Lectura 4: summaryDoc
+            __step = 'tx:get:summaryDoc';
+            const summaryDoc = db.collection('billing_summary').doc(monthKey.replace('-', ''));
+            const summarySnapshot = await transaction.get(summaryDoc);
+            
+            console.log('✅ Todas las lecturas completadas. Iniciando construcción de objetos...');
+            
+            // ===== SOPORTE PARA PANELES LEGACY (solo si existía sin rangos) =====
+            const isLegacyPanelExisting = panelSnapshot && currentData.effectiveRanges.length === 0;
+            if (isLegacyPanelExisting) {
+                console.log(`🔧 Inicializando effectiveRanges para panel legacy existente sin rangos: ${panelIdStr}`);
+                let estadoBase = PANEL_STATES.ACTIVO;
+                if (currentData.fechaBaja) {
+                    estadoBase = PANEL_STATES.BAJA;
+                } else if (currentData.fechaDesmontaje) {
+                    estadoBase = PANEL_STATES.DESMONTADO;
+                } else if (currentData.estado) {
+                    const estadoLegacy = currentData.estado.toUpperCase();
+                    if (estadoLegacy === 'DESMONTADO') estadoBase = PANEL_STATES.DESMONTADO;
+                    else if (estadoLegacy === 'BAJA') estadoBase = PANEL_STATES.BAJA;
+                }
+                const legacyStartDate = '2025-10-01';
+                currentData.effectiveRanges = [{ from: legacyStartDate, to: null, estado: estadoBase }];
+                currentData.estadoActual = estadoBase;
+                console.log(`✅ Panel legacy existente inicializado con estado ${estadoBase}`);
+            }
             
             // 3. Validar transición
             const stateValidation = validateStateTransition(currentData.estadoActual, action);
@@ -331,6 +600,7 @@ async function applyChange(panelId, payload) {
             }
             
             // 4. Validar rangos de fecha
+            __step = 'tx:validate:ranges';
             const rangeValidation = validateDateRanges(
                 currentData.effectiveRanges, 
                 effectiveDate, 
@@ -340,163 +610,313 @@ async function applyChange(panelId, payload) {
                 throw new Error(rangeValidation.error);
             }
             
-            // 5. Calcular impacto
-            const preview = await previewChange(panelId, action, effectiveDate, payload);
-            if (!preview.valid) {
-                throw new Error(preview.error);
+            // 5. Calcular impacto directamente (sin previewChange que hace queries)
+            __step = 'tx:calc:impact';
+            // monthKey ya fue calculado arriba para las lecturas
+            const tarifaMes = tarifaBaseMes || currentData.tarifaBaseMes || TARIFA_BASE_2025;
+            let diasFacturables = 0;
+            
+            // Calcular días según la acción
+            switch (action) {
+                case CHANGE_ACTIONS.ALTA:
+                    diasFacturables = calcularDiasFacturables(effectiveDate, null);
+                    break;
+                case CHANGE_ACTIONS.DESMONTAJE_TEMPORAL:
+                    diasFacturables = calcularDiasFacturables(null, effectiveDate);
+                    break;
+                case CHANGE_ACTIONS.REINSTALACION:
+                    diasFacturables = calcularDiasFacturables(effectiveDate, null);
+                    break;
+                case CHANGE_ACTIONS.BAJA_DEFINITIVA:
+                    diasFacturables = calcularDiasFacturables(null, effectiveDate);
+                    break;
+                case CHANGE_ACTIONS.CAMBIO_TARIFA:
+                    diasFacturables = 30;
+                    break;
             }
             
-            const changeData = preview.preview;
+            const importeAFacturar = calcularImporteFacturar(diasFacturables, tarifaMes);
             
-            // 6. Crear evento de cambio
-            const changeRecord = {
-                action: action,
-                effectiveDate: firebase.firestore.Timestamp.fromDate(new Date(effectiveDate)),
-                monthKey: changeData.monthKey,
-                motivo: motivo || null,
-                tarifaBaseMes: tarifaBaseMes || currentData.tarifaBaseMes || TARIFA_BASE_2025,
-                diasFacturables: changeData.diasFacturables,
-                importeAFacturar: changeData.importeAFacturar,
-                snapshotBefore: {
-                    estadoActual: currentData.estadoActual,
-                    tarifaBaseMes: currentData.tarifaBaseMes
-                },
-                snapshotAfter: {
-                    estadoActual: stateValidation.newState,
-                    tarifaBaseMes: tarifaBaseMes || currentData.tarifaBaseMes
-                },
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                createdBy: { uid, email },
-                idempotencyKey: idempotencyKey
+            const changeData = {
+                estadoActual: currentData.estadoActual,
+                estadoFuturo: stateValidation.newState,
+                tarifaBaseMes: tarifaMes,
+                diasFacturables: diasFacturables,
+                importeAFacturar: importeAFacturar,
+                monthKey: monthKey,
+                effectiveDate: formatDateISO(effectiveDate)
             };
             
-            transaction.set(changeDoc, changeRecord);
+            // 6. Crear evento de cambio - OBJETO COMPLETAMENTE NUEVO
+            __step = 'tx:build:changeRecord';
+            const changeRecord = {
+                action: String(action),
+                effectiveDate: firebase.firestore.Timestamp.fromDate(new Date(effectiveDate)),
+                monthKey: String(changeData.monthKey),
+                motivo: motivo ? String(motivo) : null,
+                tarifaBaseMes: Number(tarifaMes),
+                diasFacturables: Number(changeData.diasFacturables),
+                importeAFacturar: Number(changeData.importeAFacturar),
+                snapshotBefore: {
+                    estadoActual: String(currentData.estadoActual),
+                    tarifaBaseMes: Number(currentData.tarifaBaseMes)
+                },
+                snapshotAfter: {
+                    estadoActual: String(stateValidation.newState),
+                    tarifaBaseMes: Number(tarifaMes)
+                },
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                createdBy: { 
+                    uid: String(uid), 
+                    email: String(email) 
+                },
+                idempotencyKey: String(idempotencyKey)
+            };
             
-            // 7. Actualizar estado del panel
-            const newEffectiveRanges = [...(currentData.effectiveRanges || [])];
+            // 🔍 DEBUGGER - Verificar changeRecord antes de guardar
+            console.log('🔍 DEBUGGER - Intentando guardar changeRecord');
+            console.log('🔍 Tipo de changeRecord:', typeof changeRecord);
+            console.log('🔍 Keys de changeRecord:', Object.keys(changeRecord));
+            console.log('🔍 Valores de changeRecord:', Object.entries(changeRecord).map(([k, v]) => ({
+                key: k,
+                value: v,
+                type: typeof v,
+                constructor: v?.constructor?.name
+            })));
+            
+            // NOTA: No escribir todavía. Todos los reads deben ejecutarse antes de los writes.
+            
+            // 7. Actualizar estado del panel - OBJETO COMPLETAMENTE NUEVO
+            // Copiar rangos manualmente creando objetos completamente nuevos
+            __step = 'tx:build:newEffectiveRanges';
+            const newEffectiveRanges = [];
+            
+            for (const range of currentData.effectiveRanges) {
+                newEffectiveRanges.push({
+                    from: String(range.from),
+                    to: range.to ? String(range.to) : null,
+                    estado: String(range.estado)
+                });
+            }
+            
             const dateISO = formatDateISO(effectiveDate);
             
             // Actualizar rangos según la acción
             if (action === CHANGE_ACTIONS.ALTA) {
                 newEffectiveRanges.push({
-                    from: dateISO,
+                    from: String(dateISO),
                     to: null,
-                    estado: PANEL_STATES.ACTIVO
+                    estado: String(PANEL_STATES.ACTIVO)
                 });
             } else if (action === CHANGE_ACTIONS.DESMONTAJE_TEMPORAL) {
-                // Cerrar rango activo y crear nuevo desmontado
+                // Cerrar rango activo en fecha de desmontaje
                 const activeRange = newEffectiveRanges.find(r => r.to === null);
                 if (activeRange) {
-                    activeRange.to = dateISO;
+                    activeRange.to = String(dateISO);
                 }
                 newEffectiveRanges.push({
-                    from: dateISO,
+                    from: String(addDays(dateISO, 1)),
                     to: null,
-                    estado: PANEL_STATES.DESMONTADO
+                    estado: String(PANEL_STATES.DESMONTADO)
                 });
             } else if (action === CHANGE_ACTIONS.REINSTALACION) {
-                // Cerrar rango desmontado y crear nuevo activo
+                // Cerrar rango desmontado en fecha de reinstalación
                 const desmontadoRange = newEffectiveRanges.find(r => r.to === null && r.estado === PANEL_STATES.DESMONTADO);
                 if (desmontadoRange) {
-                    desmontadoRange.to = dateISO;
+                    desmontadoRange.to = String(dateISO);
                 }
                 newEffectiveRanges.push({
-                    from: dateISO,
+                    from: String(addDays(dateISO, 1)),
                     to: null,
-                    estado: PANEL_STATES.ACTIVO
+                    estado: String(PANEL_STATES.ACTIVO)
                 });
             } else if (action === CHANGE_ACTIONS.BAJA_DEFINITIVA) {
                 // Cerrar todos los rangos activos
                 newEffectiveRanges.forEach(range => {
                     if (range.to === null) {
-                        range.to = dateISO;
+                        range.to = String(dateISO);
                     }
                 });
                 newEffectiveRanges.push({
-                    from: dateISO,
+                    from: String(dateISO),
                     to: null,
-                    estado: PANEL_STATES.BAJA
+                    estado: String(PANEL_STATES.BAJA)
                 });
             }
             
+            // Crear objeto completamente nuevo para actualizar panel
+            __step = 'tx:build:updatedPanelData';
             const updatedPanelData = {
-                ...currentData,
-                estadoActual: stateValidation.newState,
+                codigo: String(currentData.codigo),
+                municipio: String(currentData.municipio),
+                estadoActual: String(stateValidation.newState),
                 effectiveRanges: newEffectiveRanges,
-                tarifaBaseMes: tarifaBaseMes || currentData.tarifaBaseMes || TARIFA_BASE_2025,
+                tarifaBaseMes: Number(tarifaMes),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedBy: { uid, email }
+                updatedBy: { 
+                    uid: String(uid), 
+                    email: String(email) 
+                }
             };
             
+            // Preservar campos opcionales como strings limpios
+            if (currentData.fechaBaja) {
+                updatedPanelData.fechaBaja = String(currentData.fechaBaja);
+            }
+            if (currentData.fechaDesmontaje) {
+                updatedPanelData.fechaDesmontaje = String(currentData.fechaDesmontaje);
+            }
+            if (currentData.estado) {
+                updatedPanelData.estado = String(currentData.estado);
+            }
+            if (currentData.creadoLegacy) {
+                updatedPanelData.creadoLegacy = true;
+            }
+            
+            // 🔍 DEBUGGER - Verificar updatedPanelData antes de guardar
+            console.log('🔍 DEBUGGER - Intentando guardar updatedPanelData');
+            console.log('🔍 Tipo de updatedPanelData:', typeof updatedPanelData);
+            console.log('🔍 Keys de updatedPanelData:', Object.keys(updatedPanelData));
+            console.log('🔍 Valores de updatedPanelData:', Object.entries(updatedPanelData).map(([k, v]) => ({
+                key: k,
+                value: v,
+                type: typeof v,
+                constructor: v?.constructor?.name,
+                isArray: Array.isArray(v)
+            })));
+            
+            // NOTA: NO escribir panelDoc todavía - primero todos los reads
+            
+            // 8. Actualizar facturación mensual del panel - OBJETO COMPLETAMENTE NUEVO
+            // monthBillingDoc y monthBillingSnapshot ya fueron leídos arriba
+            
+            let updatedBilling;
+            if (monthBillingSnapshot.exists) {
+                const existingBilling = monthBillingSnapshot.data();
+                
+                // Crear objeto de acciones completamente nuevo
+                const newAcciones = {};
+                const existingAcciones = existingBilling.acciones || {};
+                
+                // Copiar solo valores numéricos
+                for (const key in existingAcciones) {
+                    if (typeof existingAcciones[key] === 'number') {
+                        newAcciones[String(key)] = Number(existingAcciones[key]);
+                    }
+                }
+                
+                // Agregar o incrementar la acción actual
+                newAcciones[String(action)] = (newAcciones[String(action)] || 0) + 1;
+                
+                __step = 'tx:build:updatedBilling:exists';
+                updatedBilling = {
+                    panelId: String(panelIdStr),
+                    monthKey: String(changeData.monthKey),
+                    totalDiasFacturables: Number((existingBilling.totalDiasFacturables || 0) + changeData.diasFacturables),
+                    totalImporte: Number((existingBilling.totalImporte || 0) + changeData.importeAFacturar),
+                    acciones: newAcciones,
+                    lastChangeAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastChangeBy: { 
+                        uid: String(uid), 
+                        email: String(email) 
+                    }
+                };
+            } else {
+                __step = 'tx:build:updatedBilling:new';
+                updatedBilling = {
+                    panelId: String(panelIdStr),
+                    monthKey: String(changeData.monthKey),
+                    totalDiasFacturables: Number(changeData.diasFacturables),
+                    totalImporte: Number(changeData.importeAFacturar),
+                    acciones: {
+                        [String(action)]: 1
+                    },
+                    lastChangeAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastChangeBy: { 
+                        uid: String(uid), 
+                        email: String(email) 
+                    }
+                };
+            }
+            
+            // 🔍 DEBUGGER - Verificar updatedBilling antes de guardar
+            console.log('🔍 DEBUGGER - Intentando guardar updatedBilling');
+            console.log('🔍 Tipo de updatedBilling:', typeof updatedBilling);
+            console.log('🔍 Keys de updatedBilling:', Object.keys(updatedBilling));
+            console.log('🔍 Valores de updatedBilling:', Object.entries(updatedBilling).map(([k, v]) => ({
+                key: k,
+                value: v,
+                type: typeof v,
+                constructor: v?.constructor?.name,
+                isArray: Array.isArray(v)
+            })));
+            
+            // NOTA: NO escribir monthBillingDoc todavía - primero todos los reads
+            
+            // 9. Actualizar resumen global del mes - OBJETO COMPLETAMENTE NUEVO
+            // summaryDoc y summarySnapshot ya fueron leídos arriba
+            
+            let updatedSummary;
+            if (summarySnapshot.exists) {
+                // Actualizar incrementalmente el resumen existente
+                const currentSummary = summarySnapshot.data();
+                const newTotalImporte = Number((currentSummary.totalImporteMes || 0) + changeData.importeAFacturar);
+                
+                __step = 'tx:build:updatedSummary:exists';
+                updatedSummary = {
+                    monthKey: String(changeData.monthKey),
+                    totalPanelesFacturables: Number(currentSummary.totalPanelesFacturables || 0),
+                    totalImporteMes: Math.round(newTotalImporte * 100) / 100,
+                    totalAcciones: Number((currentSummary.totalAcciones || 0) + 1),
+                    lastChangeAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastChangeBy: { 
+                        uid: String(uid), 
+                        email: String(email) 
+                    }
+                };
+                
+                // Si es el primer cambio de este panel en el mes, incrementar contador de paneles
+                if (!monthBillingSnapshot.exists) {
+                    updatedSummary.totalPanelesFacturables += 1;
+                }
+            } else {
+                // Crear nuevo resumen si no existe
+                __step = 'tx:build:updatedSummary:new';
+                updatedSummary = {
+                    monthKey: String(changeData.monthKey),
+                    totalPanelesFacturables: 1,
+                    totalImporteMes: Number(changeData.importeAFacturar),
+                    totalAcciones: 1,
+                    lastChangeAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastChangeBy: { 
+                        uid: String(uid), 
+                        email: String(email) 
+                    }
+                };
+            }
+            
+            // 🔍 DEBUGGER - Verificar updatedSummary antes de guardar
+            console.log('🔍 DEBUGGER - Intentando guardar updatedSummary');
+            console.log('🔍 Tipo de updatedSummary:', typeof updatedSummary);
+            console.log('🔍 Keys de updatedSummary:', Object.keys(updatedSummary));
+            console.log('🔍 Valores de updatedSummary:', Object.entries(updatedSummary).map(([k, v]) => ({
+                key: k,
+                value: v,
+                type: typeof v,
+                constructor: v?.constructor?.name
+            })));
+            
+            // ===== Escribir todos los documentos (después de terminar TODOS los reads) =====
+            __step = 'tx:write:changeDoc';
+            transaction.set(changeDoc, changeRecord);
+
+            __step = 'tx:write:panelDoc';
             transaction.set(panelDoc, updatedPanelData, { merge: true });
-            
-            // 8. Actualizar facturación mensual del panel
-            const monthBillingDoc = db.collection('panel_month_billing')
-                .doc(`${panelId}_${changeData.monthKey.replace('-', '')}`);
-            
-            const monthBillingSnapshot = await transaction.get(monthBillingDoc);
-            const currentBilling = monthBillingSnapshot.exists ? monthBillingSnapshot.data() : {
-                panelId: panelId,
-                monthKey: changeData.monthKey,
-                totalDiasFacturables: 0,
-                totalImporte: 0,
-                acciones: {}
-            };
-            
-            currentBilling.totalDiasFacturables += changeData.diasFacturables;
-            currentBilling.totalImporte += changeData.importeAFacturar;
-            currentBilling.acciones[action] = (currentBilling.acciones[action] || 0) + 1;
-            currentBilling.lastChangeAt = firebase.firestore.FieldValue.serverTimestamp();
-            currentBilling.lastChangeBy = { uid, email };
-            
-            transaction.set(monthBillingDoc, currentBilling);
-            
-            // 9. Recalcular resumen global del mes correctamente
-            // En lugar de sumar incrementalmente, recalcular desde panel_month_billing
-            const summaryDoc = db.collection('billing_summary').doc(changeData.monthKey.replace('-', ''));
-            
-            // Obtener todos los panel_month_billing del mes para recalcular totales
-            const monthPrefix = changeData.monthKey.replace('-', '');
-            const monthBillingQuery = await db.collection('panel_month_billing')
-                .where('monthKey', '==', changeData.monthKey)
-                .get();
-            
-            let totalImporteMes = 0;
-            let totalPanelesFacturables = 0;
-            let totalAcciones = 0;
-            
-            // Incluir el panel actual que acabamos de actualizar
-            const allPanelBilling = [currentBilling];
-            
-            // Agregar el resto de paneles del mes (excluyendo el actual para evitar duplicados)
-            monthBillingQuery.forEach(doc => {
-                const data = doc.data();
-                if (data.panelId !== panelId) {
-                    allPanelBilling.push(data);
-                }
-            });
-            
-            // Calcular totales reales
-            allPanelBilling.forEach(billing => {
-                totalImporteMes += billing.totalImporte || 0;
-                if (billing.totalDiasFacturables > 0) {
-                    totalPanelesFacturables += 1;
-                }
-                // Contar todas las acciones
-                Object.values(billing.acciones || {}).forEach(count => {
-                    totalAcciones += count;
-                });
-            });
-            
-            const updatedSummary = {
-                monthKey: changeData.monthKey,
-                totalPanelesFacturables: totalPanelesFacturables,
-                totalImporteMes: Math.round(totalImporteMes * 100) / 100, // Redondeo bancario
-                totalAcciones: totalAcciones,
-                lastChangeAt: firebase.firestore.FieldValue.serverTimestamp(),
-                lastChangeBy: { uid, email }
-            };
-            
+
+            __step = 'tx:write:monthBillingDoc';
+            transaction.set(monthBillingDoc, updatedBilling);
+
+            __step = 'tx:write:summaryDoc';
             transaction.set(summaryDoc, updatedSummary);
             
             return {
@@ -505,10 +925,24 @@ async function applyChange(panelId, payload) {
                 data: {
                     changeRecord,
                     updatedPanel: updatedPanelData,
-                    billing: currentBilling,
+                    billing: updatedBilling,
                     summary: updatedSummary
                 }
             };
+            } catch (txErr) {
+                console.error('⛔️ DEBUG TX FAILED at step:', __step, txErr);
+                // Volcar contexto mínimo para ayudar a diagnóstico
+                try {
+                    console.error('⛔️ Contexto rápido:', {
+                        step: __step,
+                        panelIdStr,
+                        action,
+                        effectiveDate,
+                        idempotencyKey
+                    });
+                } catch {}
+                throw txErr;
+            }
         });
         
         console.log('✅ Cambio aplicado exitosamente:', result);
