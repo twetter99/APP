@@ -1121,6 +1121,226 @@ async function migrateBillingSummary(monthKey = null) {
     }
 }
 
+/**
+ * Actualiza un evento existente y recalcula facturación
+ */
+async function updateChange(panelId, changeId, newPayload) {
+    try {
+        console.log(`🔄 Actualizando evento ${changeId} del panel ${panelId}`);
+        
+        const panelIdStr = String(panelId).trim();
+        const panelIdNum = !isNaN(Number(panelIdStr)) ? Number(panelIdStr) : null;
+        
+        // Buscar panel (por código string, numérico y fallback por docId directo)
+        let panelQuery = await db.collection('paneles')
+            .where('codigo', '==', panelIdStr)
+            .limit(1)
+            .get();
+
+        if (panelQuery.empty && panelIdNum !== null) {
+            panelQuery = await db.collection('paneles')
+                .where('codigo', '==', panelIdNum)
+                .limit(1)
+                .get();
+        }
+
+        let panelDoc;
+        if (!panelQuery.empty) {
+            panelDoc = panelQuery.docs[0];
+            console.log(`✅ Panel encontrado por código para updateChange. docId: ${panelDoc.id}`);
+        } else {
+            console.warn(`⚠️ Panel ${panelIdStr} no encontrado por código en updateChange. Intentando docId directo...`);
+            const byIdSnapshot = await db.collection('paneles').doc(panelIdStr).get();
+            if (!byIdSnapshot.exists) {
+                throw new Error(`Panel ${panelIdStr} no encontrado`);
+            }
+            panelDoc = byIdSnapshot;
+            console.log(`✅ Panel encontrado por docId directo para updateChange. docId: ${panelDoc.id}`);
+        }
+        
+        const changeRef = panelDoc.ref.collection('changes').doc(changeId);
+        const changeSnapshot = await changeRef.get();
+        
+        if (!changeSnapshot.exists) {
+            throw new Error(`Evento ${changeId} no encontrado`);
+        }
+        
+        const oldChange = changeSnapshot.data();
+        const monthKey = oldChange.monthKey;
+        
+        // Eliminar el evento viejo y aplicar el nuevo
+        await deleteChange(panelId, changeId, { skipRebuild: true });
+        await applyChange(panelId, newPayload);
+        
+        // Reconstruir facturación del mes
+        await rebuildMonthlyBilling(monthKey);
+        
+        console.log(`✅ Evento actualizado exitosamente`);
+        return { success: true };
+        
+    } catch (error) {
+        console.error('❌ Error actualizando evento:', error);
+        throw error;
+    }
+}
+
+/**
+ * Elimina un evento y recalcula facturación
+ */
+async function deleteChange(panelId, changeId, options = {}) {
+    try {
+        console.log(`🗑️ Eliminando evento ${changeId} del panel ${panelId}`);
+        
+        const panelIdStr = String(panelId).trim();
+        const panelIdNum = !isNaN(Number(panelIdStr)) ? Number(panelIdStr) : null;
+        
+        // Buscar panel (por código string, numérico y fallback por docId directo)
+        let panelQuery = await db.collection('paneles')
+            .where('codigo', '==', panelIdStr)
+            .limit(1)
+            .get();
+
+        if (panelQuery.empty && panelIdNum !== null) {
+            panelQuery = await db.collection('paneles')
+                .where('codigo', '==', panelIdNum)
+                .limit(1)
+                .get();
+        }
+
+        let panelDoc;
+        if (!panelQuery.empty) {
+            panelDoc = panelQuery.docs[0];
+            console.log(`✅ Panel encontrado por código para deleteChange. docId: ${panelDoc.id}`);
+        } else {
+            console.warn(`⚠️ Panel ${panelIdStr} no encontrado por código en deleteChange. Intentando docId directo...`);
+            const byIdSnapshot = await db.collection('paneles').doc(panelIdStr).get();
+            if (!byIdSnapshot.exists) {
+                throw new Error(`Panel ${panelIdStr} no encontrado`);
+            }
+            panelDoc = byIdSnapshot;
+            console.log(`✅ Panel encontrado por docId directo para deleteChange. docId: ${panelDoc.id}`);
+        }
+
+        const changeRef = panelDoc.ref.collection('changes').doc(changeId);
+        const changeSnapshot = await changeRef.get();
+        
+        if (!changeSnapshot.exists) {
+            throw new Error(`Evento ${changeId} no encontrado`);
+        }
+        
+        const changeData = changeSnapshot.data();
+        const monthKey = changeData.monthKey;
+        
+        // Eliminar el documento del evento
+        await changeRef.delete();
+        
+        console.log(`✅ Evento eliminado de Firestore`);
+        
+        // Reconstruir facturación del mes (a menos que skipRebuild esté activo)
+        if (!options.skipRebuild) {
+            await rebuildMonthlyBilling(monthKey);
+            console.log(`✅ Facturación del mes ${monthKey} reconstruida`);
+        }
+        
+        return { success: true, monthKey };
+        
+    } catch (error) {
+        console.error('❌ Error eliminando evento:', error);
+        throw error;
+    }
+}
+
+/**
+ * Obtiene todos los eventos de un panel
+ */
+async function getPanelChanges(panelId, monthKey = null) {
+    try {
+        console.log(`📋 Obteniendo eventos del panel ${panelId}, monthKey: ${monthKey}`);
+        
+        const panelIdStr = String(panelId).trim();
+        const panelIdNum = !isNaN(Number(panelIdStr)) ? Number(panelIdStr) : null;
+        
+        // Buscar panel por codigo (string/num) y, si no aparece, intentar por docId directo (fallback)
+        let panelDocRef = null;
+        let panelQuery = await db.collection('paneles')
+            .where('codigo', '==', panelIdStr)
+            .limit(1)
+            .get();
+        
+        if (panelQuery.empty && panelIdNum !== null) {
+            panelQuery = await db.collection('paneles')
+                .where('codigo', '==', panelIdNum)
+                .limit(1)
+                .get();
+        }
+        
+        if (!panelQuery.empty) {
+            panelDocRef = panelQuery.docs[0].ref;
+            console.log(`✅ Panel encontrado por código. docId: ${panelDocRef.id}`);
+        } else {
+            // Fallback: intentar por docId exacto
+            console.warn(`⚠️ Panel no encontrado por código (${panelIdStr}). Intentando docId directo...`);
+            const byIdSnapshot = await db.collection('paneles').doc(panelIdStr).get();
+            if (byIdSnapshot.exists) {
+                panelDocRef = byIdSnapshot.ref;
+                console.log(`✅ Panel encontrado por docId: ${panelDocRef.id}`);
+            } else {
+                console.log(`❌ Panel ${panelIdStr} no encontrado (código ni docId)`);
+                return [];
+            }
+        }
+        
+        let changesSnapshot;
+        
+        try {
+            // Intentar con ordenamiento
+            let query = panelDocRef.collection('changes');
+            
+            if (monthKey) {
+                query = query.where('monthKey', '==', monthKey);
+            }
+            
+            query = query.orderBy('effectiveDate', 'desc');
+            changesSnapshot = await query.get();
+            
+        } catch (error) {
+            // Si falla por falta de índice, intentar sin ordenamiento
+            console.warn('⚠️ No se puede ordenar, intentando sin orderBy:', error.message);
+            
+            let query = panelDocRef.collection('changes');
+            
+            if (monthKey) {
+                query = query.where('monthKey', '==', monthKey);
+            }
+            
+            changesSnapshot = await query.get();
+        }
+        
+        const changes = [];
+        
+        changesSnapshot.forEach(doc => {
+            changes.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        // Ordenar manualmente si se obtuvieron resultados
+        changes.sort((a, b) => {
+            const dateA = a.effectiveDate?.toDate ? a.effectiveDate.toDate() : new Date(a.effectiveDate);
+            const dateB = b.effectiveDate?.toDate ? b.effectiveDate.toDate() : new Date(b.effectiveDate);
+            return dateB - dateA; // Descendente (más reciente primero)
+        });
+        
+        console.log(`✅ ${changes.length} eventos encontrados para panel ${panelIdStr} (doc: ${panelDocRef.id}) en mes ${monthKey || 'todos'}`);
+        return changes;
+        
+    } catch (error) {
+        console.error('❌ Error obteniendo eventos:', error);
+        return [];
+    }
+}
+
 // ===== EXPORTAR FUNCIONES =====
 window.BillingService = {
     // Funciones principales
@@ -1128,6 +1348,9 @@ window.BillingService = {
     previewChange,
     applyChange,
     getMonthBillingSummary,
+    getPanelChanges,
+    updateChange,
+    deleteChange,
     
     // Utilidades
     calcularDiasFacturables,

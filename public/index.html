@@ -1345,6 +1345,85 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
+        /* Estilos para gestión de eventos */
+        .event-item {
+            transition: background 0.2s ease;
+        }
+
+        .event-item:hover {
+            background: var(--gray-lighter);
+        }
+
+        .btn-event-menu {
+            transition: all 0.2s ease;
+        }
+
+        .btn-event-menu:hover {
+            border-color: var(--gray);
+            background: var(--gray-lighter);
+        }
+
+        .event-dropdown {
+            animation: fadeInDown 0.2s ease;
+        }
+
+        .event-dropdown.hidden {
+            display: none;
+        }
+
+        .event-dropdown button:hover {
+            background: var(--gray-lighter);
+        }
+
+        /* Dropdown flotante para desglose dinámico */
+        .desglose-dropdown {
+            position: fixed !important; /* Sacar del flujo y del clipping del contenedor */
+            top: 0;
+            left: 0;
+            background: #FFFFFF;
+            border: 1px solid var(--gray-light);
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+            min-width: 180px;
+            z-index: 4000; /* Más alto que cualquier card */
+            overflow: hidden;
+        }
+        .desglose-dropdown button {
+            background: transparent;
+            transition: background 0.15s ease;
+        }
+        .desglose-dropdown button:hover {
+            background: #F3F4F6;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .minimal-btn-secondary {
+            padding: 8px 16px;
+            background: var(--white);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--gray-dark);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .minimal-btn-secondary:hover {
+            background: var(--gray-lighter);
+            border-color: var(--gray);
+        }
+
         .search-box input {
             width: 100%;
             max-width: 400px;
@@ -2838,6 +2917,170 @@
             </div>
         </div>
 
+        <!-- Modal: Ver Eventos del Panel -->
+        <div id="modalEventosPanel" class="modal-overlay hidden">
+            <div class="modal-content" style="max-width: 900px;">
+                <div class="modal-header">
+                    <h2>📋 Eventos del Panel <span id="eventoPanelCodigo"></span></h2>
+                    <button class="modal-close" onclick="closeModal('modalEventosPanel')">&times;</button>
+                </div>
+
+                <div class="modal-body">
+                    <div id="listaEventos" style="max-height: 400px; overflow-y: auto;">
+                        <!-- Lista de eventos se cargará aquí -->
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn-modal-secondary" onclick="closeModal('modalEventosPanel')">Cerrar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Editar Evento -->
+        <div id="modalEditarEvento" class="modal-overlay hidden">
+            <div class="modal-content" style="max-width: 560px;">
+                <div class="modal-header">
+                    <h2>Editar Evento</h2>
+                    <button class="modal-close" onclick="closeModal('modalEditarEvento')">&times;</button>
+                </div>
+
+                <div class="modal-body">
+                    <input type="hidden" id="editEventoId">
+                    <input type="hidden" id="editEventoPanelId">
+
+                    <div class="form-group">
+                        <label>Acción</label>
+                        <select id="editEventoAccion">
+                            <option value="ALTA">ALTA</option>
+                            <option value="REINSTALACION">REINSTALACIÓN</option>
+                            <option value="DESMONTAJE_TEMPORAL">DESMONTAJE TEMPORAL</option>
+                            <option value="BAJA_DEFINITIVA">BAJA DEFINITIVA</option>
+                            <option value="CAMBIO_TARIFA">CAMBIO DE TARIFA</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Fecha Efectiva</label>
+                        <input type="date" id="editEventoFecha">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Tarifa Base Mes (€)</label>
+                        <input type="number" id="editEventoTarifa" step="0.01" placeholder="37.70">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Motivo (opcional)</label>
+                        <textarea id="editEventoMotivo" rows="3" placeholder="Descripción del cambio..."></textarea>
+                    </div>
+
+                    <div id="editEventoPreview" style="margin-top: 20px; padding: 16px; background: var(--gray-lighter); border-radius: 8px; display: none;">
+                        <h4 style="font-size: 14px; font-weight: 600; margin-bottom: 12px;">Vista Previa</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px;">
+                            <div>
+                                <strong>Estado actual:</strong> <span id="editPreviewEstadoActual"></span>
+                            </div>
+                            <div>
+                                <strong>Estado futuro:</strong> <span id="editPreviewEstadoFuturo"></span>
+                            </div>
+                            <div>
+                                <strong>Días facturables:</strong> <span id="editPreviewDias"></span>
+                            </div>
+                            <div>
+                                <strong>Importe:</strong> <span id="editPreviewImporte"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn-modal-secondary" onclick="closeModal('modalEditarEvento')">Cancelar</button>
+                    <button class="btn-modal-primary" onclick="guardarEdicionEvento()">💾 Guardar Cambios</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Editar Datos Agregados (panel_month_billing) -->
+        <div id="modalEditarAgregado" class="modal-overlay hidden">
+            <div class="modal-content" style="max-width: 540px; background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
+                <div class="modal-header" style="border-bottom: 1px solid #e5e7eb; padding: 20px 28px 12px 28px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0;">
+                        <span style="font-size: 1.45rem; font-weight: 700; color: #222; letter-spacing: 0.01em; white-space: nowrap;">Editar facturación mensual</span>
+                        <button class="modal-close" onclick="closeModal('modalEditarAgregado')" style="background: none; border: none; font-size: 1.7rem; color: #888; cursor: pointer; margin-left: 32px;">&times;</button>
+                    </div>
+                </div>
+
+                <div class="modal-body" style="padding: 24px 28px;">
+                    <input type="hidden" id="editAgregadoPanelId">
+                    <input type="hidden" id="editAgregadoMonthKey">
+                    <input type="hidden" id="editAgregadoDocId">
+
+                    <!-- Información del Panel en Grid -->
+                    <div id="editAgregadoInfo" style="margin-bottom: 24px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                        <!-- Se llenará dinámicamente -->
+                    </div>
+
+                    <!-- Campos de Edición en Grid 2 Columnas -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <div class="form-group" style="margin: 0;">
+                            <label for="editAgregadoDias" style="font-weight: 500; color: #222; margin-bottom: 6px; display: block;">Días Facturables</label>
+                            <input type="number" 
+                                   id="editAgregadoDias" 
+                                   min="0" 
+                                   max="30" 
+                                   step="1" 
+                                   placeholder="0-30" 
+                                   onchange="recalcularImporteAgregado()"
+                                   style="width: 100%; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 15px; font-weight: 500; text-align: center; background: #fafbfc;">
+                            <small style="display: block; margin-top: 4px; color: #888; font-size: 11px;">0-30 días del mes</small>
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label for="editAgregadoTarifa" style="font-weight: 500; color: #222; margin-bottom: 6px; display: block;">Tarifa Base (€/mes)</label>
+                            <input type="number" 
+                                   id="editAgregadoTarifa" 
+                                   step="0.01" 
+                                   min="0" 
+                                   value="37.70" 
+                                   onchange="recalcularImporteAgregado()"
+                                   style="width: 100%; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 15px; font-weight: 500; text-align: center; background: #fafbfc;">
+                            <small style="display: block; margin-top: 4px; color: #888; font-size: 11px;">Tarifa mensual completa</small>
+                        </div>
+                    </div>
+
+                    <!-- Importe Total - Destacado -->
+                    <div class="form-group" style="margin: 0 0 20px 0;">
+               <label for="editAgregadoImporte" style="font-weight: 500; color: #222; margin-bottom: 6px; display: block;">Importe Total (€)</label>
+               <input type="number" 
+                   id="editAgregadoImporte" 
+                   step="0.01" 
+                   min="0" 
+                   placeholder="0.00" 
+                   readonly
+                   style="width: 100%; padding: 14px 16px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 24px; font-weight: 600; color: #222; background: #f6f7f9; text-align: center;">
+                    </div>
+
+                    <!-- Vista Previa del Cálculo -->
+                    <div id="editAgregadoPreview" style="padding: 16px 20px; background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%); border-left: 4px solid #667eea; border-radius: 8px; margin-bottom: 20px;">
+                        <div style="font-size: 13px; color: #444; font-family: 'Courier New', monospace; font-weight: 500;">
+                            <span id="editAgregadoCalculo">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Nota Informativa -->
+                    <div style="padding: 14px 16px; background: #FFFBEB; border-left: 4px solid #F59E0B; border-radius: 8px; font-size: 12px; color: #92400E; line-height: 1.5;">
+                        <strong style="font-size: 12px; color: #222; font-weight: 600; margin-bottom: 4px; display: block;">Información</strong>
+                        Los cambios se guardan directamente en Firestore (<code style="background: #f3f4f6; padding: 2px 6px; border-radius: 3px; font-size: 10px;">panel_month_billing</code>). El importe se calcula automáticamente: <strong>(Días × Tarifa) ÷ 30</strong>.
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="padding: 16px 24px; background: #F9FAFB; border-top: 1px solid #E5E7EB; display: flex; gap: 12px; justify-content: flex-end;">
+                    <button class="btn-modal-secondary" onclick="closeModal('modalEditarAgregado')" style="padding: 10px 24px; font-weight: 500; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; color: #222;">Cancelar</button>
+                    <button class="btn-modal-primary" onclick="guardarDatosAgregados()" style="padding: 10px 32px; font-weight: 600; background: #222; color: #fff; border-radius: 6px; border: none;">Guardar Cambios</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Modal: Cambio de Tarifa -->
         <div id="modalCambioTarifa" class="modal-overlay hidden">
             <div class="modal-content modal-tarifa">
@@ -3276,6 +3519,7 @@
                     <th style="padding: 10px; text-align: right;">Importe Base</th>
                     <th style="padding: 10px; text-align: right;">Importe Nuevo</th>
                     <th style="padding: 10px; text-align: right;">Δ Importe</th>
+                    <th style="padding: 10px; text-align: center;">Acciones</th>
                 </tr>
             </thead><tbody>`;
             
@@ -3300,6 +3544,14 @@
                     <td style="padding: 8px; text-align: right; font-weight: 500;">${formatEuro(item.importeNuevo || 0)}</td>
                     <td style="padding: 8px; text-align: right; color: ${deltaColor}; font-weight: bold;">
                         ${(item.diferenciaImporte || 0) >= 0 ? '+' : ''}${formatEuro(item.diferenciaImporte || 0)}
+                    </td>
+                    <td style="padding: 8px; text-align: center;">
+                        <button class="btn-desglose-menu" onclick="toggleDesgloseMenu(event, ${index})" style="width: 28px; height: 28px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer; font-size: 16px; line-height: 1;">⋮</button>
+                        <div id="desgloseMenu${index}" class="event-dropdown desglose-dropdown hidden">
+                            <button onclick="verEventosPanel('${item.panelId}', '${item.municipio}')" style="width: 100%; padding: 10px 16px; text-align: left; border: none; background: none; cursor: pointer; font-size: 14px; border-bottom: 1px solid var(--gray-lighter);">Ver eventos</button>
+                            <button onclick="editarPrimerEvento('${item.panelId}', '${item.monthKey}')" style="width: 100%; padding: 10px 16px; text-align: left; border: none; background: none; cursor: pointer; font-size: 14px; border-bottom: 1px solid var(--gray-lighter);">Editar evento</button>
+                            <button onclick="eliminarPrimerEvento('${item.panelId}', '${item.monthKey}', '${item.municipio}')" style="width: 100%; padding: 10px 16px; text-align: left; border: none; background: none; cursor: pointer; font-size: 14px; color: var(--red);">Eliminar evento</button>
+                        </div>
                     </td>
                 </tr>`;
             });
@@ -4147,7 +4399,7 @@
                 // Si hay pocos registros, buscar mes base para heredar
                 const UMBRAL = 400;
                 if (billingData.size < UMBRAL) {
-                    console.log('🔄 Pocos registros, buscando mes base...');
+                    console.log(`🔄 Solo ${billingData.size} registros en ${monthKey}, buscando mes base...`);
                     
                     // Buscar recursivamente hacia atrás
                     let buscarMes = monthKey;
@@ -4157,26 +4409,32 @@
                         const yearAnt = m === 1 ? y - 1 : y;
                         buscarMes = `${yearAnt}-${String(mesAnt).padStart(2, '0')}`;
                         
+                        console.log(`   Buscando en ${buscarMes}...`);
+                        
                         const baseSnap = await firebaseDB.collection('panel_month_billing')
                             .where('monthKey', '==', buscarMes)
                             .get();
                         
-                        console.log(`   ${buscarMes}: ${baseSnap.size} registros`);
+                        console.log(`   ${buscarMes}: ${baseSnap.size} registros encontrados`);
                         
                         if (baseSnap.size >= UMBRAL) {
-                            console.log(`✅ Base encontrada: ${buscarMes}`);
+                            console.log(`✅ Base encontrada: ${buscarMes} con ${baseSnap.size} registros`);
+                            let heredados = 0;
                             // Copiar datos de la base para paneles SIN eventos en mes actual
                             baseSnap.forEach(doc => {
                                 const data = doc.data();
-                                if (!billingData.has(data.panelId)) {
-                                    billingData.set(data.panelId, {
+                                const panelIdBase = String(data.panelId).trim();
+                                if (!billingData.has(panelIdBase)) {
+                                    billingData.set(panelIdBase, {
                                         dias: data.totalDiasFacturables || 0,
                                         importe: data.totalImporte || 0,
                                         heredado: true
                                     });
+                                    heredados++;
                                 }
                             });
-                            console.log(`   Ahora tenemos ${billingData.size} paneles (incluyendo heredados)`);
+                            console.log(`   ✅ ${heredados} paneles heredados de ${buscarMes}`);
+                            console.log(`   📊 Total en billingData: ${billingData.size} paneles`);
                             break;
                         }
                     }
@@ -4250,6 +4508,9 @@
                     </div>
                     <div class="minimal-list-item-actions">
                         <span class="minimal-list-item-badge ${estadoClass}">${estadoBadge}</span>
+                        <button class="minimal-btn-secondary btn-small" onclick="verEventosPanel('${panelIdStr}', '${panel.municipio}')" style="margin-left: 12px;">
+                            Ver eventos
+                        </button>
                     </div>
                 `;
                 panelsList.appendChild(listItem);
@@ -7095,37 +7356,64 @@
                 let factBase = {};
                 let baseImporteTotal = 0;
                 const UMBRAL_MES_BASE = 400;
-                
-                // Buscar hacia atrás hasta encontrar un mes con >400 registros
-                let buscarMes = monthKey;
-                for (let i = 0; i <= 24; i++) {
-                    const baseSnapshot = await firebaseDB.collection('panel_month_billing')
-                        .where('monthKey', '==', buscarMes)
-                        .get();
-                    
-                    console.log(`   ${buscarMes}: ${baseSnapshot.size} registros`);
-                    
-                    if (baseSnapshot.size >= UMBRAL_MES_BASE) {
-                        mesBase = buscarMes;
-                        console.log(`✅ Mes base encontrado: ${mesBase} con ${baseSnapshot.size} paneles\n`);
-                        
-                        baseSnapshot.forEach(doc => {
-                            const data = doc.data();
-                            factBase[data.panelId] = {
-                                dias: data.totalDiasFacturables || 0,
-                                importe: data.totalImporte || 0,
-                                municipio: data.municipio || ''
-                            };
-                            baseImporteTotal += data.totalImporte || 0;
-                        });
-                        break;
+
+                // Regla especial: si el mes inmediatamente anterior tiene datos (>0), úsalo como base sin umbral
+                const [yCur, mCur] = monthKey.split('-').map(Number);
+                const prevM = mCur === 1 ? 12 : mCur - 1;
+                const prevY = mCur === 1 ? yCur - 1 : yCur;
+                const mesAnteriorInmediato = `${prevY}-${String(prevM).padStart(2, '0')}`;
+                const snapshotInmediato = await firebaseDB.collection('panel_month_billing')
+                    .where('monthKey', '==', mesAnteriorInmediato)
+                    .get();
+                console.log(`   Chequeo inmediato ${mesAnteriorInmediato}: ${snapshotInmediato.size} registros`);
+                if (snapshotInmediato.size > 0) {
+                    mesBase = mesAnteriorInmediato;
+                    console.log(`✅ Mes base inmediato aceptado sin umbral: ${mesBase} (${snapshotInmediato.size} registros)\n`);
+                    snapshotInmediato.forEach(doc => {
+                        const data = doc.data();
+                        factBase[data.panelId] = {
+                            dias: data.totalDiasFacturables || 0,
+                            importe: data.totalImporte || 0,
+                            municipio: data.municipio || ''
+                        };
+                        baseImporteTotal += data.totalImporte || 0;
+                    });
+                }
+
+                // Búsqueda histórica con umbral (solo si no se aceptó el inmediato anterior)
+                if (!mesBase) {
+                    console.log('   No hay datos en el mes anterior inmediato. Aplicando búsqueda con umbral…');
+                    // Buscar hacia atrás hasta encontrar un mes con >400 registros
+                    let buscarMes = monthKey;
+                    for (let i = 0; i <= 24; i++) {
+                        const baseSnapshot = await firebaseDB.collection('panel_month_billing')
+                            .where('monthKey', '==', buscarMes)
+                            .get();
+
+                        console.log(`   ${buscarMes}: ${baseSnapshot.size} registros`);
+
+                        if (baseSnapshot.size >= UMBRAL_MES_BASE) {
+                            mesBase = buscarMes;
+                            console.log(`✅ Mes base encontrado: ${mesBase} con ${baseSnapshot.size} paneles\n`);
+
+                            baseSnapshot.forEach(doc => {
+                                const data = doc.data();
+                                factBase[data.panelId] = {
+                                    dias: data.totalDiasFacturables || 0,
+                                    importe: data.totalImporte || 0,
+                                    municipio: data.municipio || ''
+                                };
+                                baseImporteTotal += data.totalImporte || 0;
+                            });
+                            break;
+                        }
+
+                        // Retroceder un mes
+                        const [y, m] = buscarMes.split('-').map(Number);
+                        const mesAnt = m === 1 ? 12 : m - 1;
+                        const yearAnt = m === 1 ? y - 1 : y;
+                        buscarMes = `${yearAnt}-${String(mesAnt).padStart(2, '0')}`;
                     }
-                    
-                    // Retroceder un mes
-                    const [y, m] = buscarMes.split('-').map(Number);
-                    const mesAnt = m === 1 ? 12 : m - 1;
-                    const yearAnt = m === 1 ? y - 1 : y;
-                    buscarMes = `${yearAnt}-${String(mesAnt).padStart(2, '0')}`;
                 }
                 
                 if (!mesBase) {
@@ -7252,6 +7540,7 @@
                             desglose.push({
                                 panelId: evento.panelId,
                                 municipio: evento.municipio,
+                                monthKey: monthKey,
                                 eventos: numEventos,
                                 diasBase: base.dias,
                                 diasNuevos: evento.diasNuevos,
@@ -7315,6 +7604,850 @@
                 throw error;
             }
         };
+
+        // ============================================
+        // GESTIÓN DE EVENTOS DEL PANEL
+        // ============================================
+
+        /**
+         * Ver todos los eventos de un panel
+         */
+        async function verEventosPanel(panelId, municipio) {
+            try {
+                console.log(`📋 Abriendo eventos del panel ${panelId}`);
+                
+                const month = parseInt(document.getElementById('currentMonth').value);
+                const year = parseInt(document.getElementById('currentYear').value);
+                const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+                
+                // Primero intentar obtener eventos detallados de la subcolección changes
+                let eventos = await BillingService.getPanelChanges(panelId, monthKey);
+                
+                // Si no hay eventos detallados, buscar datos agregados en panel_month_billing
+                let eventoAgregado = null;
+                if (eventos.length === 0) {
+                    console.log(`ℹ️ No hay eventos detallados. Consultando panel_month_billing...`);
+                    const billingDocId = `${panelId}_${monthKey.replace('-', '')}`;
+                    const billingSnap = await firebaseDB.collection('panel_month_billing').doc(billingDocId).get();
+                    
+                    if (billingSnap.exists) {
+                        const data = billingSnap.data();
+                        console.log(`✅ Encontrado documento agregado en panel_month_billing:`, data);
+                        
+                        // Construir evento sintético a partir de datos agregados
+                        eventoAgregado = {
+                            id: billingDocId,
+                            panelId: data.panelId || panelId,
+                            monthKey: data.monthKey || monthKey,
+                            totalDiasFacturables: data.totalDiasFacturables || 0,
+                            totalImporte: data.totalImporte || 0,
+                            acciones: data.acciones || {},
+                            municipio: data.municipio || municipio,
+                            esAgregado: true // Marca para renderizar distinto
+                        };
+                    }
+                }
+                
+                // Actualizar título del modal
+                document.getElementById('eventoPanelCodigo').textContent = `${panelId} - ${municipio}`;
+                
+                // Renderizar lista de eventos
+                const listaEventos = document.getElementById('listaEventos');
+                
+                if (eventos.length === 0 && !eventoAgregado) {
+                    listaEventos.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: var(--gray);">
+                            <p>No hay eventos registrados para este panel en ${monthKey}</p>
+                            <p style="font-size: 12px; color: var(--gray); margin-top: 8px;">No se encontraron datos ni en 'changes' ni en 'panel_month_billing'.</p>
+                        </div>
+                    `;
+                } else if (eventoAgregado && eventos.length === 0) {
+                    // Mostrar vista de datos agregados
+                    const accionesList = Object.entries(eventoAgregado.acciones)
+                        .map(([action, count]) => {
+                            const label = {
+                                'ALTA': '📈 ALTA',
+                                'REINSTALACION': '🔄 REINSTALACIÓN',
+                                'DESMONTAJE_TEMPORAL': '📦 DESMONTAJE',
+                                'BAJA_DEFINITIVA': '📉 BAJA',
+                                'CAMBIO_TARIFA': '💰 CAMBIO TARIFA'
+                            }[action] || action;
+                            return `<span style="background: #E5E7EB; padding: 4px 10px; border-radius: 12px; font-size: 12px; margin-right: 8px;">${label} (${count})</span>`;
+                        })
+                        .join('');
+                    
+                    listaEventos.innerHTML = `
+                        <div style="border: 1px solid #E5E7EB; border-radius: 8px; padding: 20px; background: #F9FAFB;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                                <span style="font-size: 20px;">📊</span>
+                                <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Resumen de Facturación del Mes</h3>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                                <div>
+                                    <div style="color: var(--gray); font-size: 12px; margin-bottom: 4px;">Días Facturables</div>
+                                    <div style="font-size: 24px; font-weight: 700; color: #1F2937;">${eventoAgregado.totalDiasFacturables}</div>
+                                </div>
+                                <div>
+                                    <div style="color: var(--gray); font-size: 12px; margin-bottom: 4px;">Importe Total</div>
+                                    <div style="font-size: 24px; font-weight: 700; color: #059669;">${formatEuro(eventoAgregado.totalImporte)}</div>
+                                </div>
+                            </div>
+                            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #E5E7EB;">
+                                <div style="color: var(--gray); font-size: 12px; margin-bottom: 8px;">Acciones del mes</div>
+                                <div style="display: flex; flex-wrap: wrap; gap: 8px;">${accionesList || '<span style="color: var(--gray); font-size: 13px;">Sin acciones registradas</span>'}</div>
+                            </div>
+                            <div style="margin-top: 20px; padding: 12px; background: #FEF3C7; border-left: 3px solid #F59E0B; border-radius: 4px; font-size: 13px; color: #92400E;">
+                                <strong>ℹ️ Datos agregados</strong><br>
+                                Estos datos provienen de <code>panel_month_billing</code>. No hay eventos detallados en la subcolección <code>changes</code>.
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    listaEventos.innerHTML = eventos.map((evento, index) => {
+                        const fecha = evento.effectiveDate.toDate ? 
+                            evento.effectiveDate.toDate().toLocaleDateString('es-ES') : 
+                            new Date(evento.effectiveDate).toLocaleDateString('es-ES');
+                        
+                        const accionLabel = {
+                            'ALTA': '📈 ALTA',
+                            'REINSTALACION': '🔄 REINSTALACIÓN',
+                            'DESMONTAJE_TEMPORAL': '📦 DESMONTAJE',
+                            'BAJA_DEFINITIVA': '📉 BAJA',
+                            'CAMBIO_TARIFA': '💰 CAMBIO TARIFA'
+                        }[evento.action] || evento.action;
+                        
+                        return `
+                            <div class="event-item" style="border-bottom: 1px solid var(--gray-lighter); padding: 16px; position: relative;">
+                                <div style="display: flex; justify-content: space-between; align-items: start;">
+                                    <div style="flex: 1;">
+                                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                                            <span style="font-weight: 600; font-size: 15px;">${accionLabel}</span>
+                                            <span style="color: var(--gray); font-size: 13px;">${fecha}</span>
+                                        </div>
+                                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; font-size: 13px;">
+                                            <div>
+                                                <span style="color: var(--gray);">Días:</span>
+                                                <strong>${evento.diasFacturables || 0}</strong>
+                                            </div>
+                                            <div>
+                                                <span style="color: var(--gray);">Importe:</span>
+                                                <strong>${formatEuro(evento.importeAFacturar || 0)}</strong>
+                                            </div>
+                                            <div>
+                                                <span style="color: var(--gray);">Estado:</span>
+                                                <strong>${evento.snapshotAfter?.estadoActual || '-'}</strong>
+                                            </div>
+                                        </div>
+                                        ${evento.motivo ? `<div style="margin-top: 8px; font-size: 12px; color: var(--gray);">💬 ${evento.motivo}</div>` : ''}
+                                    </div>
+                                    <div class="event-actions-menu" style="position: relative;">
+                                        <button class="btn-event-menu" onclick="toggleEventMenu(event, ${index})" style="width: 32px; height: 32px; border: 1px solid var(--gray-light); background: white; border-radius: 6px; cursor: pointer; font-size: 18px; line-height: 1;">⋮</button>
+                                        <div id="eventMenu${index}" class="event-dropdown hidden" style="position: absolute; right: 0; top: 100%; margin-top: 4px; background: white; border: 1px solid var(--gray-light); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); min-width: 140px; z-index: 1000;">
+                                            <button onclick="verEvento('${panelId}', '${evento.id}', ${index})" style="width: 100%; padding: 10px 16px; text-align: left; border: none; background: none; cursor: pointer; font-size: 14px; border-bottom: 1px solid var(--gray-lighter);">Ver</button>
+                                            <button onclick="editarEvento('${panelId}', '${evento.id}', ${index})" style="width: 100%; padding: 10px 16px; text-align: left; border: none; background: none; cursor: pointer; font-size: 14px; border-bottom: 1px solid var(--gray-lighter);">Editar</button>
+                                            <button onclick="confirmarEliminarEvento('${panelId}', '${evento.id}', '${accionLabel}', '${fecha}')" style="width: 100%; padding: 10px 16px; text-align: left; border: none; background: none; cursor: pointer; font-size: 14px; color: var(--red);">Eliminar</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+                
+                // Abrir modal
+                document.getElementById('modalEventosPanel').classList.remove('hidden');
+                document.getElementById('modalEventosPanel').classList.add('show');
+                
+            } catch (error) {
+                console.error('❌ Error cargando eventos:', error);
+                alert(`Error cargando eventos:\n\n${error.message}`);
+            }
+        }
+
+        /**
+         * Toggle del menú de 3 puntos
+         */
+        function toggleEventMenu(event, index) {
+            event.stopPropagation();
+            const menu = document.getElementById(`eventMenu${index}`);
+            
+            // Cerrar todos los demás menús
+            document.querySelectorAll('.event-dropdown').forEach(m => {
+                if (m !== menu) m.classList.add('hidden');
+            });
+            
+            menu.classList.toggle('hidden');
+        }
+
+        // Cerrar menús al hacer click fuera
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.event-dropdown').forEach(m => m.classList.add('hidden'));
+        });
+
+        /**
+         * Editar un evento
+         */
+        async function editarEvento(panelId, eventoId, index) {
+            try {
+                console.log(`✏️ Editando evento ${eventoId}`);
+                
+                // Cerrar menú
+                // Guard clausula: cuando se invoca desde el desglose no existe el menú de evento
+                const menu = document.getElementById(`eventMenu${index}`);
+                if (menu) {
+                    menu.classList.add('hidden');
+                }
+                
+                // Obtener datos del evento
+                const eventos = await BillingService.getPanelChanges(panelId);
+                const evento = eventos.find(e => e.id === eventoId);
+                
+                if (!evento) {
+                    throw new Error('Evento no encontrado');
+                }
+                
+                // Rellenar formulario
+                document.getElementById('editEventoId').value = eventoId;
+                document.getElementById('editEventoPanelId').value = panelId;
+                document.getElementById('editEventoAccion').value = evento.action;
+                
+                const fecha = evento.effectiveDate.toDate ? 
+                    evento.effectiveDate.toDate().toISOString().split('T')[0] : 
+                    new Date(evento.effectiveDate).toISOString().split('T')[0];
+                document.getElementById('editEventoFecha').value = fecha;
+                
+                document.getElementById('editEventoTarifa').value = evento.tarifaBaseMes || 37.70;
+                document.getElementById('editEventoMotivo').value = evento.motivo || '';
+                
+                // Abrir modal de edición
+                document.getElementById('modalEditarEvento').classList.remove('hidden');
+                document.getElementById('modalEditarEvento').classList.add('show');
+                
+                // Actualizar preview
+                await actualizarPreviewEdicion();
+                
+            } catch (error) {
+                console.error('❌ Error abriendo edición:', error);
+                alert(`Error:\n\n${error.message}`);
+            }
+        }
+
+        /**
+         * Ver un evento (solo lectura)
+         */
+        async function verEvento(panelId, eventoId, index) {
+            try {
+                console.log(`👁️ Viendo evento ${eventoId}`);
+                const menu = document.getElementById(`eventMenu${index}`);
+                if (menu) menu.classList.add('hidden');
+
+                // Reutilizamos getPanelChanges para no tocar servicio (ya trae todos y luego filtramos)
+                const eventos = await BillingService.getPanelChanges(panelId);
+                const evento = eventos.find(e => e.id === eventoId);
+                if (!evento) {
+                    alert('Evento no encontrado');
+                    return;
+                }
+
+                // Construir HTML de detalle
+                const fecha = evento.effectiveDate?.toDate ? evento.effectiveDate.toDate() : new Date(evento.effectiveDate);
+                const fechaStr = fecha.toLocaleDateString('es-ES');
+                const horaStr = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                const createdAtDate = evento.createdAt?.toDate ? evento.createdAt.toDate() : null;
+                const createdStr = createdAtDate ? `${createdAtDate.toLocaleDateString('es-ES')} ${createdAtDate.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}` : '—';
+
+                const actionTextMap = {
+                    ALTA: 'ALTA',
+                    REINSTALACION: 'REINSTALACIÓN',
+                    DESMONTAJE_TEMPORAL: 'DESMONTAJE TEMPORAL',
+                    BAJA_DEFINITIVA: 'BAJA DEFINITIVA',
+                    CAMBIO_TARIFA: 'CAMBIO TARIFA'
+                };
+                const accion = actionTextMap[evento.action] || evento.action;
+
+                // Crear modal si no existe
+                let modal = document.getElementById('modalVerEvento');
+                if (!modal) {
+                    modal = document.createElement('div');
+                    modal.id = 'modalVerEvento';
+                    modal.className = 'modal-overlay hidden';
+                    modal.innerHTML = `
+                        <div class="modal-content" style="max-width:600px;">
+                            <div class="modal-header">
+                                <h2 style="font-size:20px;font-weight:600;margin:0;">Detalle del Evento</h2>
+                                <button class="modal-close" onclick="closeModal('modalVerEvento')">&times;</button>
+                            </div>
+                            <div class="modal-body" id="detalleEventoBody" style="font-size:14px; line-height:1.5;"></div>
+                            <div class="modal-actions" style="display:flex;justify-content:flex-end;margin-top:24px;">
+                                <button class="btn-modal-secondary" onclick="closeModal('modalVerEvento')" style="width:auto;">Cerrar</button>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(modal);
+                }
+
+                const body = modal.querySelector('#detalleEventoBody');
+                body.innerHTML = `
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                        <div>
+                            <div style=\"color:var(--gray);font-size:12px;\">Acción</div>
+                            <div style=\"font-weight:600;\">${accion}</div>
+                        </div>
+                        <div>
+                            <div style=\"color:var(--gray);font-size:12px;\">Fecha efectiva</div>
+                            <div>${fechaStr} ${horaStr}</div>
+                        </div>
+                        <div>
+                            <div style=\"color:var(--gray);font-size:12px;\">Creado</div>
+                            <div>${createdStr}</div>
+                        </div>
+                        <div>
+                            <div style=\"color:var(--gray);font-size:12px;\">Tarifa base mes</div>
+                            <div>${(evento.tarifaBaseMes||0).toFixed(2)} €</div>
+                        </div>
+                        <div>
+                            <div style=\"color:var(--gray);font-size:12px;\">Días facturables</div>
+                            <div>${evento.diasFacturables||0}</div>
+                        </div>
+                        <div>
+                            <div style=\"color:var(--gray);font-size:12px;\">Importe facturar</div>
+                            <div>${formatEuro(evento.importeAFacturar||0)}</div>
+                        </div>
+                        <div>
+                            <div style=\"color:var(--gray);font-size:12px;\">Estado antes</div>
+                            <div>${evento.snapshotBefore?.estadoActual || '—'}</div>
+                        </div>
+                        <div>
+                            <div style=\"color:var(--gray);font-size:12px;\">Estado después</div>
+                            <div>${evento.snapshotAfter?.estadoActual || '—'}</div>
+                        </div>
+                    </div>
+                    ${evento.motivo ? `<div style=\"margin-top:16px;\">\n                        <div style=\"color:var(--gray);font-size:12px;\">Motivo</div>\n                        <div style=\"background:var(--gray-lighter);padding:12px;border-radius:6px;white-space:pre-wrap;\">${evento.motivo}</div>\n                    </div>` : ''}
+                    <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                        <div>
+                            <div style=\"color:var(--gray);font-size:12px;\">Usuario</div>
+                            <div>${evento.createdBy?.email || '—'}</div>
+                        </div>
+                        <div>
+                            <div style=\"color:var(--gray);font-size:12px;\">Idempotency Key</div>
+                            <div style=\"font-size:12px;word-break:break-all;\">${evento.idempotencyKey || '—'}</div>
+                        </div>
+                    </div>
+                `;
+
+                modal.classList.remove('hidden');
+                modal.classList.add('show');
+            } catch (error) {
+                console.error('Error viendo evento', error);
+                alert('Error mostrando el evento: ' + error.message);
+            }
+        }
+
+        /**
+         * Actualizar vista previa de edición
+         */
+        async function actualizarPreviewEdicion() {
+            try {
+                const panelId = document.getElementById('editEventoPanelId').value;
+                const action = document.getElementById('editEventoAccion').value;
+                const fecha = document.getElementById('editEventoFecha').value;
+                const tarifa = parseFloat(document.getElementById('editEventoTarifa').value) || 37.70;
+                
+                if (!fecha || !action) return;
+                
+                const preview = await BillingService.previewChange(panelId, action, fecha, {
+                    tarifaBaseMes: tarifa
+                });
+                
+                if (preview.valid) {
+                    document.getElementById('editEventoPreview').style.display = 'block';
+                    document.getElementById('editPreviewEstadoActual').textContent = preview.preview.estadoActual;
+                    document.getElementById('editPreviewEstadoFuturo').textContent = preview.preview.estadoFuturo;
+                    document.getElementById('editPreviewDias').textContent = preview.preview.diasFacturables;
+                    document.getElementById('editPreviewImporte').textContent = formatEuro(preview.preview.importeAFacturar);
+                }
+                
+            } catch (error) {
+                console.error('Error en preview:', error);
+            }
+        }
+
+        // Listeners para actualizar preview en tiempo real
+        ['editEventoAccion', 'editEventoFecha', 'editEventoTarifa'].forEach(id => {
+            const elem = document.getElementById(id);
+            if (elem) {
+                // Actualiza al cambiar y mientras se escribe (instantáneo)
+                elem.addEventListener('change', actualizarPreviewEdicion);
+                elem.addEventListener('input', actualizarPreviewEdicion);
+            }
+        });
+
+        /**
+         * Toggle del menú de 3 puntos en tabla de desglose
+         */
+        function toggleDesgloseMenu(event, index) {
+            event.stopPropagation();
+            const btn = event.currentTarget;
+            const menu = document.getElementById(`desgloseMenu${index}`);
+
+            // Cerrar otros menús del desglose
+            document.querySelectorAll('.desglose-dropdown').forEach(m => {
+                if (m !== menu) m.classList.add('hidden');
+            });
+
+            // Si ya está visible, ocultar
+            if (!menu.classList.contains('hidden')) {
+                menu.classList.add('hidden');
+                return;
+            }
+
+            // Mostrar temporalmente para medir
+            menu.classList.remove('hidden');
+            menu.style.visibility = 'hidden';
+
+            const rect = btn.getBoundingClientRect();
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const menuWidth = Math.max(180, menu.offsetWidth || 180);
+            const menuHeight = Math.max(120, menu.offsetHeight || 160);
+
+            let left = rect.right - menuWidth;
+            let top = rect.bottom + 6;
+
+            // Ajuste a bordes
+            if (left + menuWidth > vw - 8) left = vw - menuWidth - 8;
+            if (left < 8) left = 8;
+            if (top + menuHeight > vh - 8) top = rect.top - menuHeight - 6;
+            if (top < 8) top = 8;
+
+            menu.style.left = `${left}px`;
+            menu.style.top = `${top}px`;
+            menu.style.visibility = 'visible';
+
+            const closeOnScroll = () => {
+                menu.classList.add('hidden');
+                window.removeEventListener('scroll', closeOnScroll, true);
+            };
+            window.addEventListener('scroll', closeOnScroll, true);
+        }
+
+        /**
+         * Editar el primer evento del panel (acceso rápido)
+         */
+        async function editarPrimerEvento(panelId, monthKey) {
+            try {
+                // Leer directamente desde panel_month_billing
+                const billingDocId = `${panelId}_${monthKey.replace('-', '')}`;
+                console.log(`🔍 Leyendo datos de panel_month_billing/${billingDocId}...`);
+                
+                const billingSnap = await firebaseDB.collection('panel_month_billing').doc(billingDocId).get();
+                
+                if (!billingSnap.exists) {
+                    alert(
+                        `❌ No hay datos de facturación para el panel ${panelId} en ${monthKey}.\n\n` +
+                        `El documento panel_month_billing/${billingDocId} no existe en Firestore.`
+                    );
+                    return;
+                }
+                
+                const data = billingSnap.data();
+                console.log(`✅ Datos leídos desde Firestore:`, data);
+                
+                // Abrir modal de edición con los datos agregados
+                await editarDatosAgregados(panelId, monthKey);
+                
+            } catch (error) {
+                console.error('❌ Error:', error);
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        /**
+         * Editar datos agregados de panel_month_billing directamente
+         */
+        async function editarDatosAgregados(panelId, monthKey) {
+            try {
+                const billingDocId = `${panelId}_${monthKey.replace('-', '')}`;
+                console.log(`📋 Leyendo desde Firestore: panel_month_billing/${billingDocId}...`);
+                
+                const billingSnap = await firebaseDB.collection('panel_month_billing').doc(billingDocId).get();
+                
+                if (!billingSnap.exists) {
+                    alert(`No hay datos de facturación para el panel ${panelId} en ${monthKey}`);
+                    return;
+                }
+                
+                const data = billingSnap.data();
+                console.log('✅ Datos leídos de panel_month_billing:', data);
+                
+                // BUSCAR MUNICIPIO: primero en billing, luego en paneles
+                let municipio = data.municipio || null;
+                
+                if (!municipio) {
+                    console.log(`🔍 Municipio no encontrado en panel_month_billing. Buscando en colección 'paneles'...`);
+                    
+                    const panelIdStr = String(panelId).trim();
+                    const panelIdNum = !isNaN(Number(panelIdStr)) ? Number(panelIdStr) : null;
+                    
+                    // Buscar panel por codigo
+                    let panelQuery = await firebaseDB.collection('paneles')
+                        .where('codigo', '==', panelIdStr)
+                        .limit(1)
+                        .get();
+                    
+                    if (panelQuery.empty && panelIdNum !== null) {
+                        panelQuery = await firebaseDB.collection('paneles')
+                            .where('codigo', '==', panelIdNum)
+                            .limit(1)
+                            .get();
+                    }
+                    
+                    if (!panelQuery.empty) {
+                        const panelData = panelQuery.docs[0].data();
+                        municipio = panelData.municipio || null;
+                        console.log(`✅ Municipio encontrado en 'paneles':`, municipio);
+                    } else {
+                        console.warn(`⚠️ Panel ${panelId} no encontrado en colección 'paneles'`);
+                    }
+                }
+                
+                // Rellenar formulario de edición
+                document.getElementById('editAgregadoPanelId').value = panelId;
+                document.getElementById('editAgregadoMonthKey').value = monthKey;
+                document.getElementById('editAgregadoDocId').value = billingDocId;
+                document.getElementById('editAgregadoDias').value = data.totalDiasFacturables || 0;
+                document.getElementById('editAgregadoTarifa').value = 37.70; // Tarifa base por defecto
+                document.getElementById('editAgregadoImporte').value = (data.totalImporte || 0).toFixed(2);
+                
+                // Mostrar información de contexto (incluyendo municipio)
+                document.getElementById('editAgregadoInfo').innerHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                        <div style="background: white; padding: 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                            <div style="font-size: 11px; color: #6B7280; font-weight: 500; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Panel</div>
+                            <div style="font-size: 20px; font-weight: 700; color: #1F2937;">${panelId}</div>
+                        </div>
+                        <div style="background: white; padding: 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                            <div style="font-size: 11px; color: #6B7280; font-weight: 500; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Municipio</div>
+                            <div style="font-size: 16px; font-weight: 600; color: ${municipio ? '#059669' : '#DC2626'};">${municipio || 'Sin asignar'}</div>
+                        </div>
+                        <div style="background: white; padding: 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                            <div style="font-size: 11px; color: #6B7280; font-weight: 500; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Mes</div>
+                            <div style="font-size: 16px; font-weight: 600; color: #1F2937;">${monthKey}</div>
+                        </div>
+                        <div style="background: white; padding: 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                            <div style="font-size: 11px; color: #6B7280; font-weight: 500; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Documento</div>
+                            <div style="font-size: 11px; font-weight: 500; color: #6B7280; font-family: 'Courier New', monospace;">${billingDocId}</div>
+                        </div>
+                    </div>
+                `;
+                
+                // Calcular y mostrar preview inicial
+                recalcularImporteAgregado();
+                
+                // Abrir modal
+                document.getElementById('modalEditarAgregado').classList.remove('hidden');
+                document.getElementById('modalEditarAgregado').classList.add('show');
+                
+            } catch (error) {
+                console.error('❌ Error abriendo editor:', error);
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        /**
+         * Recalcular importe basado en días y tarifa
+         */
+        function recalcularImporteAgregado() {
+            const dias = parseInt(document.getElementById('editAgregadoDias').value) || 0;
+            const tarifa = parseFloat(document.getElementById('editAgregadoTarifa').value) || 37.70;
+            
+            const importe = (dias * tarifa) / 30;
+            document.getElementById('editAgregadoImporte').value = importe.toFixed(2);
+            
+            // Actualizar preview
+            const calculoEl = document.getElementById('editAgregadoCalculo');
+            if (calculoEl) {
+                calculoEl.textContent = `${dias} días × ${tarifa.toFixed(2)}€ ÷ 30 = ${importe.toFixed(2)}€`;
+            }
+        }
+
+        /**
+         * Guardar edición de datos agregados
+         */
+        async function guardarDatosAgregados() {
+            try {
+                const docId = document.getElementById('editAgregadoDocId').value;
+                const dias = parseInt(document.getElementById('editAgregadoDias').value) || 0;
+                const importe = parseFloat(document.getElementById('editAgregadoImporte').value) || 0;
+                
+                // Validaciones
+                if (dias < 0 || dias > 30) {
+                    alert('⚠️ Los días deben estar entre 0 y 30');
+                    return;
+                }
+                
+                if (importe < 0) {
+                    alert('⚠️ El importe no puede ser negativo');
+                    return;
+                }
+                
+                console.log(`💾 Actualizando panel_month_billing/${docId} en Firestore...`);
+                console.log('📦 Datos a guardar:', { dias, importe });
+                
+                // Construir objeto de actualización (solo días e importe)
+                const updateData = {
+                    totalDiasFacturables: dias,
+                    totalImporte: importe,
+                    lastChangeAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastChangeBy: {
+                        uid: firebaseAuth.currentUser?.uid || 'system',
+                        email: firebaseAuth.currentUser?.email || 'system@local'
+                    }
+                };
+                
+                await firebaseDB.collection('panel_month_billing').doc(docId).update(updateData);
+                
+                console.log('✅ Documento actualizado en Firestore');
+                alert('✅ Facturación actualizada correctamente');
+                
+                // Cerrar modal y recargar desglose
+                closeModal('modalEditarAgregado');
+                
+                const mes = parseInt(document.getElementById('currentMonth').value);
+                const year = parseInt(document.getElementById('currentYear').value);
+                const monthKey = `${year}-${String(mes).padStart(2, '0')}`;
+                await mostrarDesgloseEventos(monthKey);
+                
+            } catch (error) {
+                console.error('❌ Error guardando datos:', error);
+                alert(`Error al guardar:\n\n${error.message}`);
+            }
+        }
+
+        /**
+         * Fallback: crea un evento base si no hay eventos pero existe facturación agregada
+         * Lógica: lee panel_month_billing para estimar días facturables y genera una ALTA
+         * que reproduce esos días (día de alta calculado inversamente).
+         */
+        async function ensureEventoBase(panelId, monthKey) {
+            try {
+                // PASO 1: Leer documento panel_month_billing usando panelId (codigo) del desglose
+                const billingDocId = `${panelId}_${monthKey.replace('-', '')}`;
+                console.log(`🔍 Leyendo facturación desde Firestore: panel_month_billing/${billingDocId}...`);
+                
+                const billingSnap = await firebaseDB.collection('panel_month_billing').doc(billingDocId).get();
+                
+                if (!billingSnap.exists) {
+                    console.warn(`⚠️ panel_month_billing/${billingDocId} no existe en Firestore. No se puede generar evento base.`);
+                    return false;
+                }
+                
+                const data = billingSnap.data();
+                console.log(`✅ Facturación leída desde Firestore:`, data);
+                
+                const totalDias = data.totalDiasFacturables || 0;
+                const acciones = data.acciones || {};
+                const numAcciones = Object.values(acciones).reduce((a,b)=>a+b,0);
+                
+                if (totalDias <= 0 && numAcciones === 0) {
+                    console.warn('⚠️ Facturación sin días ni acciones. No generamos evento.');
+                    return false;
+                }
+
+                // PASO 2: GARANTIZAR EXISTENCIA DEL DOCUMENTO DEL PANEL EN COLECCIÓN 'paneles'
+                console.log(`🔍 Verificando existencia del panel ${panelId} en colección 'paneles'...`);
+                const panelIdStr = String(panelId).trim();
+                const panelIdNum = !isNaN(Number(panelIdStr)) ? Number(panelIdStr) : null;
+                
+                // Buscar por campo 'codigo' (string y numérico)
+                let panelQuery = await firebaseDB.collection('paneles')
+                    .where('codigo', '==', panelIdStr)
+                    .limit(1)
+                    .get();
+                
+                if (panelQuery.empty && panelIdNum !== null) {
+                    panelQuery = await firebaseDB.collection('paneles')
+                        .where('codigo', '==', panelIdNum)
+                        .limit(1)
+                        .get();
+                }
+
+                let panelDocRef = null;
+                if (!panelQuery.empty) {
+                    panelDocRef = panelQuery.docs[0].ref;
+                    console.log(`✅ Panel encontrado en 'paneles' con docId: ${panelDocRef.id}`);
+                } else {
+                    // Panel NO existe: crearlo con estructura mínima
+                    console.warn(`⚠️ Panel ${panelIdStr} NO existe en 'paneles'. Creándolo...`);
+                    const uid = firebaseAuth.currentUser?.uid || 'system';
+                    const email = firebaseAuth.currentUser?.email || 'system@local';
+                    
+                    const newPanelData = {
+                        codigo: panelIdStr,
+                        municipio: data.municipio || '',
+                        tarifaBaseMes: BillingService.TARIFA_BASE_2025,
+                        estadoActual: 'ACTIVO',
+                        effectiveRanges: [],
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        createdBy: { uid, email }
+                    };
+                    
+                    panelDocRef = await firebaseDB.collection('paneles').add(newPanelData);
+                    console.log(`✅ Panel creado en 'paneles' con docId: ${panelDocRef.id}`);
+                }
+
+                // Ahora SÍ podemos crear el evento con applyChange
+                const diasClamped = Math.min(30, Math.max(1, totalDias));
+                let diaAlta = 30 - diasClamped + 1;
+                diaAlta = Math.min(30, Math.max(1, diaAlta));
+                const effectiveDate = `${monthKey}-${String(diaAlta).padStart(2,'0')}`;
+                
+                const payload = {
+                    action: 'ALTA',
+                    effectiveDate: effectiveDate,
+                    motivo: `Evento base autogenerado (reconstrucción desde panel_month_billing: ${totalDias} días)`,
+                    tarifaBaseMes: data.totalImporte ? (data.totalImporte / (totalDias/30)) : BillingService.TARIFA_BASE_2025,
+                    uid: firebaseAuth.currentUser?.uid || 'system',
+                    email: firebaseAuth.currentUser?.email || 'system@local'
+                };
+                console.log('🛠️ Generando evento base con payload:', payload);
+                const result = await BillingService.applyChange(panelId, payload);
+                if (result?.success) {
+                    console.log('✅ Evento base creado');
+                    return true;
+                }
+                console.warn('⚠️ applyChange no devolvió success para evento base');
+                return false;
+            } catch (e) {
+                console.error('❌ Error creando evento base:', e);
+                return false;
+            }
+        }
+
+        /**
+         * Eliminar el primer evento del panel (acceso rápido)
+         */
+        async function eliminarPrimerEvento(panelId, monthKey, municipio) {
+            try {
+                // Leer directamente desde panel_month_billing
+                const billingDocId = `${panelId}_${monthKey.replace('-', '')}`;
+                console.log(`🔍 Buscando facturación en panel_month_billing/${billingDocId}...`);
+                
+                const billingSnap = await firebaseDB.collection('panel_month_billing').doc(billingDocId).get();
+                
+                if (!billingSnap.exists) {
+                    alert(
+                        `❌ No hay datos de facturación para el panel ${panelId} en ${monthKey}.\n\n` +
+                        `El documento panel_month_billing/${billingDocId} no existe en Firestore.`
+                    );
+                    return;
+                }
+                
+                const data = billingSnap.data();
+                console.log(`✅ Datos leídos desde Firestore:`, data);
+                
+                // Confirmar eliminación
+                const confirmacion = confirm(
+                    `¿Estás seguro de que quieres eliminar los datos de facturación del panel ${panelId} en ${monthKey}?\n\n` +
+                    `Municipio: ${data.municipio || 'N/A'}\n` +
+                    `Días: ${data.totalDiasFacturables || 0}\n` +
+                    `Importe: ${formatEuro(data.totalImporte || 0)}\n\n` +
+                    `Esta acción eliminará el documento panel_month_billing/${billingDocId}`
+                );
+                
+                if (!confirmacion) return;
+                
+                console.log(`🗑️ Eliminando panel_month_billing/${billingDocId}...`);
+                await firebaseDB.collection('panel_month_billing').doc(billingDocId).delete();
+                
+                alert('✅ Datos de facturación eliminados correctamente');
+                
+                // Recargar desglose
+                const mes = parseInt(document.getElementById('currentMonth').value);
+                const year = parseInt(document.getElementById('currentYear').value);
+                const currentMonthKey = `${year}-${String(mes).padStart(2, '0')}`;
+                await mostrarDesgloseEventos(currentMonthKey);
+                
+            } catch (error) {
+                console.error('❌ Error:', error);
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        /**
+         * Guardar edición del evento
+         */
+        async function guardarEdicionEvento() {
+            try {
+                const eventoId = document.getElementById('editEventoId').value;
+                const panelId = document.getElementById('editEventoPanelId').value;
+                const action = document.getElementById('editEventoAccion').value;
+                const fecha = document.getElementById('editEventoFecha').value;
+                const tarifa = parseFloat(document.getElementById('editEventoTarifa').value) || 37.70;
+                const motivo = document.getElementById('editEventoMotivo').value;
+                
+                if (!fecha || !action) {
+                    alert('Por favor completa todos los campos requeridos');
+                    return;
+                }
+                
+                const payload = {
+                    action: action,
+                    effectiveDate: fecha,
+                    tarifaBaseMes: tarifa,
+                    motivo: motivo,
+                    uid: firebaseAuth.currentUser.uid,
+                    email: firebaseAuth.currentUser.email
+                };
+                
+                console.log('💾 Guardando cambios del evento...');
+                
+                await BillingService.updateChange(panelId, eventoId, payload);
+                
+                alert('✅ Evento actualizado exitosamente');
+                
+                // Cerrar modales y recargar
+                closeModal('modalEditarEvento');
+                closeModal('modalEventosPanel');
+                await updateTable();
+                await actualizarDashboard();
+                
+            } catch (error) {
+                console.error('❌ Error guardando evento:', error);
+                alert(`Error al guardar:\n\n${error.message}`);
+            }
+        }
+
+        /**
+         * Confirmar eliminación de evento
+         */
+        function confirmarEliminarEvento(panelId, eventoId, accionLabel, fecha) {
+            if (confirm(`¿Seguro que deseas eliminar este evento?\n\n${accionLabel}\nFecha: ${fecha}\n\nEsta acción recalculará automáticamente la facturación del mes.`)) {
+                eliminarEvento(panelId, eventoId);
+            }
+        }
+
+        /**
+         * Eliminar evento
+         */
+        async function eliminarEvento(panelId, eventoId) {
+            try {
+                console.log('🗑️ Eliminando evento...');
+                
+                await BillingService.deleteChange(panelId, eventoId);
+                
+                alert('✅ Evento eliminado y facturación recalculada');
+                
+                // Cerrar modal y recargar
+                closeModal('modalEventosPanel');
+                await updateTable();
+                await actualizarDashboard();
+                
+            } catch (error) {
+                console.error('❌ Error eliminando evento:', error);
+                alert(`Error al eliminar:\n\n${error.message}`);
+            }
+        }
         
     </script>    </script>
 
