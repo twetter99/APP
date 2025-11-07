@@ -2539,7 +2539,7 @@
                         <option value="07">Julio</option>
                         <option value="08">Agosto</option>
                         <option value="09">Septiembre</option>
-                        <option value="10" selected>Octubre</option>
+                        <option value="10">Octubre</option>
                         <option value="11">Noviembre</option>
                         <option value="12">Diciembre</option>
                     </select>
@@ -3356,6 +3356,22 @@
         // Esta función se llama automáticamente después de autenticación exitosa
         async function loadInitialData() {
             console.log('🔄 Cargando paneles desde Firestore...');
+            
+            // Establecer mes y año actuales en los selectores
+            const fechaActual = new Date();
+            const mesActual = fechaActual.getMonth() + 1; // getMonth() retorna 0-11
+            const yearActual = fechaActual.getFullYear();
+            
+            const selectMes = document.getElementById('currentMonth');
+            const inputYear = document.getElementById('currentYear');
+            
+            if (selectMes) {
+                selectMes.value = String(mesActual).padStart(2, '0');
+                console.log(`📅 Mes establecido a: ${mesActual} (${fechaActual.toLocaleString('es-ES', { month: 'long' })} ${yearActual})`);
+            }
+            if (inputYear) {
+                inputYear.value = yearActual;
+            }
             
             try {
                 if (!window.cargarPanelesDesdeFirestore) {
