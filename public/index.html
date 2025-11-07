@@ -2487,7 +2487,7 @@
         <div class="minimal-main">
             
             <!-- Título de sección -->
-            <h1 class="minimal-section-title">Resumen del mes actual</h1>
+            <h1 class="minimal-section-title" id="tituloMes">Resumen del mes actual</h1>
             <p class="minimal-section-subtitle">Control de instalación, mantenimiento y Facturación de paneles TFT</p>
 
             <!-- Estadísticas XXL -->
@@ -3103,6 +3103,14 @@
             const monthKey = `${year}-${String(mes).padStart(2, '0')}`;
 
             console.log('📊 Calculando estadísticas DINÁMICAS para', monthKey);
+            
+            // Actualizar título con el mes seleccionado
+            const nombresMeses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                                  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            const tituloMesEl = document.getElementById('tituloMes');
+            if (tituloMesEl) {
+                tituloMesEl.textContent = `Resumen de ${nombresMeses[mes - 1]} ${year}`;
+            }
 
             try {
                 // Verificar que la función de cálculo dinámico esté disponible
