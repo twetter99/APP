@@ -2514,6 +2514,14 @@
                 </div>
             </div>
 
+        <!-- Desglose de Eventos y Ajustes -->
+        <div id="desgloseEventos" class="card" style="display: none; margin-top: 20px;">
+            <h2 class="card-title">📊 Desglose de Facturación Dinámica</h2>
+            <div id="desgloseContent" style="padding: 15px;">
+                <!-- Se llenará dinámicamente -->
+            </div>
+        </div>
+
         <div class="params-actions-grid">
 
         <div class="card">
@@ -3087,45 +3095,246 @@
         }
 
         // ============================================
-        // ACTUALIZAR ESTADÍSTICAS DASHBOARD
+        // ACTUALIZAR ESTADÍSTICAS DASHBOARD - CON CÁLCULO DINÁMICO
         // ============================================
-        function actualizarEstadisticas() {
+        async function actualizarEstadisticas() {
             const mes = parseInt(document.getElementById('currentMonth').value);
             const year = parseInt(document.getElementById('currentYear').value);
+            const monthKey = `${year}-${String(mes).padStart(2, '0')}`;
 
-            let activos = 0;      // días = 30
-            let pausados = 0;     // 0 < días < 30
-            let facturacionTotal = 0;
+            console.log('📊 Calculando estadísticas DINÁMICAS para', monthKey);
 
-            console.log('🔢 Calculando estadísticas para', panelsData.length, 'paneles');
+            try {
+                // Verificar que la función de cálculo dinámico esté disponible
+                if (!window.calcularFacturacionDinamica) {
+                    console.warn('⚠️ Función de cálculo dinámico no disponible');
+                    mostrarEstadisticasPorDefecto();
+                    return;
+                }
 
-            panelsData.forEach(panel => {
-                const fact = calcularFacturacion(panel, mes, year);
-                const dias = Number(fact.dias) || 0;
-                const importe = Number(fact.importe) || 0;
+                // CALCULAR FACTURACIÓN DINÁMICA
+                const resultado = await window.calcularFacturacionDinamica(monthKey);
+                
+                if (resultado) {
+                    console.log('✅ Facturación calculada dinámicamente:', resultado);
 
-                if (dias >= 30) activos++;
-                else if (dias > 0) pausados++;
+                    // Actualizar estadísticas en la UI
+                    const statTotalEl = document.getElementById('statTotal');
+                    const statActivosEl = document.getElementById('statActivos');
+                    const statPausadosEl = document.getElementById('statDesmontados');
+                    const statFacturacionEl = document.getElementById('statFacturacion');
+                    
+                    if (statTotalEl) statTotalEl.textContent = resultado.totalPaneles || panelsData.length;
+                    if (statActivosEl) statActivosEl.textContent = resultado.panelesActivos || 0;
+                    if (statPausadosEl) statPausadosEl.textContent = resultado.panelesPausados || 0;
+                    if (statFacturacionEl) statFacturacionEl.textContent = formatEuro(resultado.totalImporte);
+                    
+                    const totalRevenueEl = document.getElementById('totalRevenue');
+                    if (totalRevenueEl) totalRevenueEl.textContent = formatEuro(resultado.totalImporte);
+                    
+                    // Mostrar desglose visual si hay eventos
+                    mostrarDesgloseEventos(resultado);
+                } else {
+                    console.warn(`⚠️ No se pudo calcular facturación para ${monthKey}`);
+                    mostrarEstadisticasPorDefecto();
+                    ocultarDesgloseEventos();
+                }
+            } catch (error) {
+                console.error('❌ Error calculando estadísticas:', error);
+                console.warn('⚠️ Usando estadísticas por defecto debido a error');
+                mostrarEstadisticasPorDefecto();
+                ocultarDesgloseEventos();
+            }
+        }
 
-                facturacionTotal += importe;
-            });
-
-            console.log('📊 Resultados:', { activos, pausados, facturacionTotal, total: panelsData.length });
-
-            // Actualizar stats - VERSIÓN SEGURA
+        // Función auxiliar para mostrar estadísticas por defecto
+        function mostrarEstadisticasPorDefecto() {
             const statTotalEl = document.getElementById('statTotal');
             const statActivosEl = document.getElementById('statActivos');
             const statPausadosEl = document.getElementById('statDesmontados');
             const statFacturacionEl = document.getElementById('statFacturacion');
             
             if (statTotalEl) statTotalEl.textContent = panelsData.length;
-            if (statActivosEl) statActivosEl.textContent = activos;
-            if (statPausadosEl) statPausadosEl.textContent = pausados;
-            
-            if (statFacturacionEl) statFacturacionEl.textContent = formatEuro(facturacionTotal);
+            if (statActivosEl) statActivosEl.textContent = 0;
+            if (statPausadosEl) statPausadosEl.textContent = panelsData.length;
+            if (statFacturacionEl) statFacturacionEl.textContent = formatEuro(0);
             
             const totalRevenueEl = document.getElementById('totalRevenue');
-            if (totalRevenueEl) totalRevenueEl.textContent = formatEuro(facturacionTotal);
+            if (totalRevenueEl) totalRevenueEl.textContent = formatEuro(0);
+        }
+
+        // ============================================
+        // MOSTRAR DESGLOSE VISUAL DE EVENTOS
+        // ============================================
+        function mostrarDesgloseEventos(resultado) {
+            const desgloseCard = document.getElementById('desgloseEventos');
+            const desgloseContent = document.getElementById('desgloseContent');
+            
+            if (!desgloseCard || !desgloseContent) return;
+            
+            // Si no hay eventos o desglose, ocultar
+            if (!resultado.desglose || resultado.desglose.length === 0) {
+                desgloseCard.style.display = 'none';
+                return;
+            }
+            
+            // Construir HTML del desglose
+            let html = '';
+            
+            // Resumen general
+            html += `<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">`;
+            html += `<h3 style="margin: 0 0 10px 0; color: #333;">📋 Resumen del Cálculo</h3>`;
+            html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">`;
+            
+            if (resultado.mesBase) {
+                html += `<div>
+                    <div style="font-size: 12px; color: #666;">Base (${resultado.mesBase})</div>
+                    <div style="font-size: 18px; font-weight: bold; color: #1e3a5f;">${formatEuro(resultado.baseImporte)}</div>
+                </div>`;
+            }
+            
+            html += `<div>
+                <div style="font-size: 12px; color: #666;">Eventos Aplicados</div>
+                <div style="font-size: 18px; font-weight: bold; color: #2196F3;">${resultado.eventosAplicados || 'N/A'}</div>
+            </div>`;
+            
+            html += `<div>
+                <div style="font-size: 12px; color: #666;">Diferencia</div>
+                <div style="font-size: 18px; font-weight: bold; color: ${resultado.diferencia >= 0 ? '#4CAF50' : '#F44336'};">
+                    ${resultado.diferencia ? (resultado.diferencia >= 0 ? '+' : '') + formatEuro(resultado.diferencia) : 'N/A'}
+                </div>
+            </div>`;
+            
+            html += `<div>
+                <div style="font-size: 12px; color: #666;">Total (${resultado.monthKey})</div>
+                <div style="font-size: 18px; font-weight: bold; color: #1e3a5f;">${formatEuro(resultado.totalImporte)}</div>
+            </div>`;
+            
+            html += `</div></div>`;
+            
+            // Ordenar por diferencia de importe (mayor impacto primero)
+            const desgloseOrdenado = [...resultado.desglose].sort((a, b) => 
+                Math.abs(b.diferenciaImporte || 0) - Math.abs(a.diferenciaImporte || 0)
+            );
+            
+            const totalEventos = desgloseOrdenado.length;
+            const mostrarColapsable = totalEventos > 5;
+            
+            // Tabla de ajustes individuales con botón de expandir/colapsar
+            html += `<div style="margin: 20px 0;">`;
+            html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">`;
+            html += `<h3 style="margin: 0; color: #333;">🔄 Ajustes por Panel (${totalEventos})</h3>`;
+            
+            if (mostrarColapsable) {
+                html += `<button 
+                    id="toggleDesgloseBtn" 
+                    onclick="toggleTablaDesglose()"
+                    style="
+                        background: #2196F3; 
+                        color: white; 
+                        border: none; 
+                        padding: 8px 16px; 
+                        border-radius: 4px; 
+                        cursor: pointer;
+                        font-size: 13px;
+                        display: flex;
+                        align-items: center;
+                        gap: 5px;
+                    ">
+                    <span id="toggleDesgloseIcon">▼</span>
+                    <span id="toggleDesgloseText">Mostrar todos (${totalEventos})</span>
+                </button>`;
+            }
+            
+            html += `</div>`;
+            
+            // Contenedor de la tabla (colapsable si hay más de 5)
+            html += `<div id="tablaDesgloseContainer" style="${mostrarColapsable ? 'display: none;' : 'display: block;'} overflow-x: auto;">`;
+            html += `<table style="width: 100%; border-collapse: collapse; font-size: 13px;">`;
+            html += `<thead style="background: #1e3a5f; color: white;">
+                <tr>
+                    <th style="padding: 10px; text-align: left;">Panel</th>
+                    <th style="padding: 10px; text-align: left;">Municipio</th>
+                    <th style="padding: 10px; text-align: center;">Eventos</th>
+                    <th style="padding: 10px; text-align: right;">Días Base</th>
+                    <th style="padding: 10px; text-align: right;">Días Nuevos</th>
+                    <th style="padding: 10px; text-align: right;">Δ Días</th>
+                    <th style="padding: 10px; text-align: right;">Importe Base</th>
+                    <th style="padding: 10px; text-align: right;">Importe Nuevo</th>
+                    <th style="padding: 10px; text-align: right;">Δ Importe</th>
+                </tr>
+            </thead><tbody>`;
+            
+            desgloseOrdenado.forEach((item, index) => {
+                const rowColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                const deltaColor = (item.diferenciaImporte || 0) >= 0 ? '#4CAF50' : '#F44336';
+                
+                html += `<tr style="background: ${rowColor};">
+                    <td style="padding: 8px; font-weight: 500;">${item.panelId}</td>
+                    <td style="padding: 8px;">${item.municipio}</td>
+                    <td style="padding: 8px; text-align: center;">
+                        <span style="background: #2196F3; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">
+                            ${item.eventos || 0}
+                        </span>
+                    </td>
+                    <td style="padding: 8px; text-align: right; color: #666;">${item.diasBase || 0}</td>
+                    <td style="padding: 8px; text-align: right; font-weight: 500;">${item.diasNuevos || 0}</td>
+                    <td style="padding: 8px; text-align: right; color: ${deltaColor}; font-weight: bold;">
+                        ${(item.diferenciaDias || 0) >= 0 ? '+' : ''}${item.diferenciaDias || 0}
+                    </td>
+                    <td style="padding: 8px; text-align: right; color: #666;">${formatEuro(item.importeBase || 0)}</td>
+                    <td style="padding: 8px; text-align: right; font-weight: 500;">${formatEuro(item.importeNuevo || 0)}</td>
+                    <td style="padding: 8px; text-align: right; color: ${deltaColor}; font-weight: bold;">
+                        ${(item.diferenciaImporte || 0) >= 0 ? '+' : ''}${formatEuro(item.diferenciaImporte || 0)}
+                    </td>
+                </tr>`;
+            });
+            
+            html += `</tbody></table></div>`;
+            html += `</div>`; // Cierra el contenedor de la tabla
+            
+            // Indicador si es desde caché o base de datos
+            if (resultado.fromCache) {
+                html += `<div style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-left: 4px solid #2196F3; font-size: 12px; color: #1976D2;">
+                    <strong>ℹ️ Mes cerrado</strong> - Datos desde caché (billing_summary)
+                </div>`;
+            } else if (resultado.fromDatabase) {
+                html += `<div style="margin-top: 15px; padding: 10px; background: #e8f5e9; border-left: 4px solid #4CAF50; font-size: 12px; color: #2E7D32;">
+                    <strong>✅ Datos guardados</strong> - Leído desde panel_month_billing
+                </div>`;
+            } else {
+                html += `<div style="margin-top: 15px; padding: 10px; background: #fff3e0; border-left: 4px solid #FF9800; font-size: 12px; color: #F57C00;">
+                    <strong>🔄 Cálculo dinámico</strong> - Calculado en tiempo real desde eventos
+                </div>`;
+            }
+            
+            desgloseContent.innerHTML = html;
+            desgloseCard.style.display = 'block';
+        }
+
+        // Función para expandir/colapsar la tabla de desglose
+        function toggleTablaDesglose() {
+            const container = document.getElementById('tablaDesgloseContainer');
+            const icon = document.getElementById('toggleDesgloseIcon');
+            const text = document.getElementById('toggleDesgloseText');
+            
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                icon.textContent = '▲';
+                text.textContent = 'Ocultar';
+            } else {
+                container.style.display = 'none';
+                icon.textContent = '▼';
+                const totalEventos = container.querySelector('tbody').rows.length;
+                text.textContent = `Mostrar todos (${totalEventos})`;
+            }
+        }
+
+        function ocultarDesgloseEventos() {
+            const desgloseCard = document.getElementById('desgloseEventos');
+            if (desgloseCard) {
+                desgloseCard.style.display = 'none';
+            }
         }
 
 
@@ -3195,7 +3404,7 @@
             updateTable();
             
             // Forzar actualización de estadísticas después de cargar datos
-            actualizarEstadisticas();
+            await actualizarEstadisticas();
             
             console.log('✅ Datos cargados y estadísticas actualizadas');
             
@@ -3207,9 +3416,9 @@
             console.log('statFacturacion:', document.getElementById('statFacturacion'));
             
             // Forzar actualización manual como último recurso
-            setTimeout(() => {
+            setTimeout(async () => {
                 console.log('⏰ Ejecutando actualización diferida...');
-                actualizarEstadisticas();
+                await actualizarEstadisticas();
                 
                 // Actualización manual directa
                 const totalEl = document.getElementById('statTotal');
@@ -3870,45 +4079,88 @@
         }
 
         // Actualizar tabla
-        function updateTable() {
+        async function updateTable() {
             const month = parseInt(document.getElementById('currentMonth').value);
             const year = parseInt(document.getElementById('currentYear').value);
+            const monthKey = `${year}-${String(month).padStart(2, '0')}`;
             const searchInput = document.getElementById('searchInput');
             const searchTerm = searchInput ? searchInput.value.toUpperCase() : '';
             const panelsList = document.getElementById('panelsList');
             panelsList.innerHTML = '';
 
+            console.log(`📋 Cargando datos de facturación desde panel_month_billing para ${monthKey}...`);
+
             let totalRevenue = 0;
             let partialCount = 0;
             const municipios = new Set();
 
-            panelsData.forEach((panel, index) => {
+            // Cargar datos de facturación de TODOS los paneles del mes desde Firestore
+            const monthKeyCompact = monthKey.replace('-', '');
+            const billingData = new Map();
+            
+            try {
+                const billingSnapshot = await firebaseDB.collection('panel_month_billing')
+                    .where('monthKey', '==', monthKey)
+                    .get();
+                
+                billingSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    billingData.set(data.panelId, {
+                        dias: data.totalDiasFacturables || 0,
+                        importe: data.totalImporte || 0,
+                        acciones: data.acciones || {}
+                    });
+                });
+                
+                console.log(`✅ Cargados ${billingData.size} paneles con facturación desde Firestore`);
+            } catch (error) {
+                console.error('❌ Error cargando datos de facturación:', error);
+            }
+
+            // Procesar cada panel
+            for (const panel of panelsData) {
                 // Filtrar por Búsqueda
                 const matchSearch = !searchTerm || 
                     panel.municipio.toUpperCase().includes(searchTerm) ||
                     panel.codigo.toUpperCase().includes(searchTerm);
 
-                if (!matchSearch) return;
+                if (!matchSearch) continue;
 
-                const days = calculateDays(panel, month, year);
-                const billing = calculateBilling(days);
-                totalRevenue += parseFloat(billing);
                 municipios.add(panel.municipio);
 
-                if (days < 30) partialCount++;
+                // LEER DESDE FIRESTORE (panel_month_billing)
+                const panelIdStr = String(panel.codigo).trim();
+                const billing = billingData.get(panelIdStr);
+                
+                let days = 0;
+                let importeFacturado = 0;
+                
+                if (billing) {
+                    // Datos REALES desde Firestore
+                    days = billing.dias;
+                    importeFacturado = billing.importe;
+                } else {
+                    // Panel sin eventos registrados = 0 días, 0€
+                    days = 0;
+                    importeFacturado = 0;
+                }
 
-                // Determinar estado
+                totalRevenue += importeFacturado;
+                if (days > 0 && days < 30) partialCount++;
+
+                // Determinar estado desde effectiveState en Firestore
                 let estadoBadge = '';
                 let estadoClass = '';
-                if (panel.fechaDesmontaje) {
-                    estadoBadge = 'Desmontado';
-                    estadoClass = 'minimal-badge-dismounted';
+                
+                if (days === 0) {
+                    estadoBadge = 'Sin Facturación';
+                    estadoClass = 'minimal-badge-gray';
                 } else if (days < 30) {
-                    estadoBadge = 'Pausado';
-                    estadoClass = 'minimal-badge-paused';
+                    estadoBadge = 'Parcial';
+                    estadoClass = 'minimal-badge-orange';
                 } else {
-                    estadoBadge = 'Activo';
-                    estadoClass = 'minimal-badge-active';
+                    estadoBadge = 'Completo';
+                    estadoClass = 'minimal-badge-green';
                 }
 
                 const listItem = document.createElement('div');
@@ -3927,7 +4179,7 @@
                             </div>
                             <div class="minimal-list-item-stat">
                                 <span class="minimal-list-item-stat-label">Facturación</span>
-                                <span class="minimal-list-item-stat-value">${formatEuro(billing)}</span>
+                                <span class="minimal-list-item-stat-value">${formatEuro(importeFacturado)}</span>
                             </div>
                         </div>
                     </div>
@@ -3936,7 +4188,7 @@
                     </div>
                 `;
                 panelsList.appendChild(listItem);
-            });
+            }
 
             // Actualizar estadísticas
             const totalPanelsEl = document.getElementById('totalPanels');
@@ -3949,8 +4201,10 @@
             if (totalMunicipiosEl) totalMunicipiosEl.textContent = municipios.size;
             if (partialPanelsEl) partialPanelsEl.textContent = partialCount;
 
+            console.log(`📊 Tabla actualizada: ${panelsData.length} paneles, ${billingData.size} con facturación, Total: ${formatEuro(totalRevenue)}`);
+
             // Actualizar estadísticas VestaCP
-            actualizarEstadisticas();
+            await actualizarEstadisticas();
             actualizarBadges();
             
             // Asegurar que los filtros estén poblados
@@ -3963,9 +4217,10 @@
         }
 
         // Nueva función para aplicar múltiples filtros
-        function applyFilters() {
+        async function applyFilters() {
             const month = parseInt(document.getElementById('currentMonth').value);
             const year = parseInt(document.getElementById('currentYear').value);
+            const monthKey = `${year}-${String(month).padStart(2, '0')}`;
             
             // Obtener valores de filtros
             const searchTerm = document.getElementById('searchInput').value.toUpperCase();
@@ -3976,23 +4231,58 @@
             const panelsList = document.getElementById('panelsList');
             panelsList.innerHTML = '';
 
+            console.log(`📋 Aplicando filtros para ${monthKey}...`);
+
             let totalRevenue = 0;
             let partialCount = 0;
             let filteredCount = 0;
             const municipios = new Set();
 
-            panelsData.forEach((panel, index) => {
-                const days = calculateDays(panel, month, year);
-                const billing = calculateBilling(days);
+            // Cargar datos de facturación desde Firestore
+            const billingData = new Map();
+            
+            try {
+                const billingSnapshot = await firebaseDB.collection('panel_month_billing')
+                    .where('monthKey', '==', monthKey)
+                    .get();
+                
+                billingSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    billingData.set(data.panelId, {
+                        dias: data.totalDiasFacturables || 0,
+                        importe: data.totalImporte || 0,
+                        acciones: data.acciones || {}
+                    });
+                });
+                
+                console.log(`✅ Cargados ${billingData.size} paneles con facturación para filtrado`);
+            } catch (error) {
+                console.error('❌ Error cargando datos de facturación:', error);
+            }
+
+            for (const panel of panelsData) {
+                const panelIdStr = String(panel.codigo).trim();
+                const billing = billingData.get(panelIdStr);
+                
+                let days = 0;
+                let importeFacturado = 0;
+                
+                if (billing) {
+                    days = billing.dias;
+                    importeFacturado = billing.importe;
+                } else {
+                    days = 0;
+                    importeFacturado = 0;
+                }
                 
                 // Determinar estado del panel
                 let estado = '';
-                if (panel.fechaDesmontaje) {
-                    estado = 'desmontado';
+                if (days === 0) {
+                    estado = 'sin_facturar';
                 } else if (days < 30) {
-                    estado = 'pausado';
+                    estado = 'parcial';
                 } else {
-                    estado = 'activo';
+                    estado = 'completo';
                 }
                 
                 // Aplicar filtros
@@ -4020,26 +4310,27 @@
                     if (filterFacturacion === 'sin_facturar' && days > 0) shouldShow = false;
                 }
                 
-                if (!shouldShow) return;
+                if (!shouldShow) continue;
                 
                 // Contar para estadísticas
                 filteredCount++;
-                totalRevenue += parseFloat(billing);
+                totalRevenue += importeFacturado;
                 municipios.add(panel.municipio);
-                if (days < 30) partialCount++;
+                if (days > 0 && days < 30) partialCount++;
 
                 // Determinar badge
                 let estadoBadge = '';
                 let estadoClass = '';
-                if (panel.fechaDesmontaje) {
-                    estadoBadge = 'Desmontado';
-                    estadoClass = 'minimal-badge-dismounted';
+                
+                if (days === 0) {
+                    estadoBadge = 'Sin Facturación';
+                    estadoClass = 'minimal-badge-gray';
                 } else if (days < 30) {
-                    estadoBadge = 'Pausado';
-                    estadoClass = 'minimal-badge-paused';
+                    estadoBadge = 'Parcial';
+                    estadoClass = 'minimal-badge-orange';
                 } else {
-                    estadoBadge = 'Activo';
-                    estadoClass = 'minimal-badge-active';
+                    estadoBadge = 'Completo';
+                    estadoClass = 'minimal-badge-green';
                 }
 
                 const listItem = document.createElement('div');
@@ -4058,7 +4349,7 @@
                             </div>
                             <div class="minimal-list-item-stat">
                                 <span class="minimal-list-item-stat-label">Facturación</span>
-                                <span class="minimal-list-item-stat-value">${formatEuro(billing)}</span>
+                                <span class="minimal-list-item-stat-value">${formatEuro(importeFacturado)}</span>
                             </div>
                         </div>
                     </div>
@@ -4067,7 +4358,7 @@
                     </div>
                 `;
                 panelsList.appendChild(listItem);
-            });
+            }
 
             // Actualizar contador de resultados
             const resultsCount = document.getElementById('resultsCount');
@@ -4086,8 +4377,10 @@
             if (totalMunicipiosEl) totalMunicipiosEl.textContent = municipios.size;
             if (partialPanelsEl) partialPanelsEl.textContent = partialCount;
 
+            console.log(`📊 Filtros aplicados: ${filteredCount} paneles mostrados, Total: ${formatEuro(totalRevenue)}`);
+
             // Las estadísticas principales no cambian con los filtros
-            actualizarEstadisticas();
+            await actualizarEstadisticas();
             actualizarBadges();
         }
 
@@ -5835,11 +6128,1155 @@
             }
         };
         
+        // ===== FUNCIÓN DE MIGRACIÓN DE DATOS DESDE JSON A FIRESTORE =====
+        
+        /**
+         * Migra datos de facturación de octubre 2025 desde JSON a panel_month_billing
+         * 
+         * Esta función:
+         * 1. Carga el archivo paneles_octubre_2025.json
+         * 2. Para cada panel que NO tiene fechaDesmontaje:
+         *    - Crea un registro en panel_month_billing con 30 días facturables
+         * 3. Para paneles con fechaDesmontaje:
+         *    - Calcula días hasta el desmontaje
+         *    - Crea registro con días parciales
+         * 4. Actualiza billing_summary con los totales
+         * 
+         * USO:
+         * migrateOctober2025FromJSON()
+         */
+        window.migrateOctober2025FromJSON = async function() {
+            console.log('🔄 Iniciando migración de datos de octubre 2025 desde JSON...');
+            
+            try {
+                // Verificar autenticación
+                if (!firebaseAuth.currentUser) {
+                    throw new Error('Debes estar autenticado para ejecutar la migración');
+                }
+                
+                const user = firebaseAuth.currentUser;
+                const monthKey = '2025-10';
+                const monthKeyCompact = '202510';
+                const TARIFA_BASE = 37.70;
+                const DIAS_BASE = 30;
+                
+                // 1. Cargar datos desde JSON
+                console.log('📦 Cargando datos desde paneles_octubre_2025.json...');
+                const response = await fetch('./paneles_octubre_2025.json');
+                const panelesJSON = await response.json();
+                
+                console.log(`✅ ${panelesJSON.length} paneles cargados desde JSON`);
+                
+                // 2. Procesar cada panel
+                let procesados = 0;
+                let conFacturacion = 0;
+                let sinFacturacion = 0;
+                let errores = 0;
+                let totalImporteMes = 0;
+                
+                const batch = firebaseDB.batch();
+                const batchSize = 500; // Firestore limit
+                let batchCount = 0;
+                let batches = [batch];
+                
+                for (const panel of panelesJSON) {
+                    try {
+                        const panelId = String(panel.codigo).trim();
+                        let diasFacturables = 0;
+                        let importeFacturado = 0;
+                        
+                        // Calcular días facturables
+                        if (!panel.fechaDesmontaje) {
+                            // Panel activo todo el mes
+                            diasFacturables = 30;
+                        } else {
+                            // Panel desmontado - calcular días hasta desmontaje
+                            const fechaDesmontaje = new Date(panel.fechaDesmontaje);
+                            const mesPanel = fechaDesmontaje.getMonth() + 1;
+                            const yearPanel = fechaDesmontaje.getFullYear();
+                            
+                            if (yearPanel === 2025 && mesPanel === 10) {
+                                // Desmontado en octubre - calcular días
+                                diasFacturables = fechaDesmontaje.getDate();
+                            } else if (yearPanel > 2025 || (yearPanel === 2025 && mesPanel > 10)) {
+                                // Desmontado después de octubre - mes completo
+                                diasFacturables = 30;
+                            } else {
+                                // Desmontado antes de octubre - sin facturación
+                                diasFacturables = 0;
+                            }
+                        }
+                        
+                        // Calcular importe
+                        const tarifaDiaria = TARIFA_BASE / DIAS_BASE;
+                        importeFacturado = Math.round(diasFacturables * tarifaDiaria * 100) / 100;
+                        
+                        // Solo crear registro si hay facturación
+                        if (diasFacturables > 0) {
+                            const billingDocId = `${panelId}_${monthKeyCompact}`;
+                            const billingDocRef = firebaseDB.collection('panel_month_billing').doc(billingDocId);
+                            
+                            // Crear registro de facturación
+                            const currentBatch = batches[batches.length - 1];
+                            currentBatch.set(billingDocRef, {
+                                panelId: panelId,
+                                monthKey: monthKey,
+                                totalDiasFacturables: diasFacturables,
+                                totalImporte: importeFacturado,
+                                acciones: {
+                                    MIGRACION_INICIAL: 1
+                                },
+                                lastChangeAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                lastChangeBy: {
+                                    uid: user.uid,
+                                    email: user.email
+                                },
+                                migratedFrom: 'paneles_octubre_2025.json',
+                                migratedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                            
+                            batchCount++;
+                            
+                            // Crear nuevo batch si alcanzamos el límite
+                            if (batchCount >= batchSize) {
+                                batches.push(firebaseDB.batch());
+                                batchCount = 0;
+                            }
+                            
+                            conFacturacion++;
+                            totalImporteMes += importeFacturado;
+                        } else {
+                            sinFacturacion++;
+                        }
+                        
+                        procesados++;
+                        
+                        // Log de progreso cada 50 paneles
+                        if (procesados % 50 === 0) {
+                            console.log(`📊 Progreso: ${procesados}/${panelesJSON.length} paneles procesados`);
+                        }
+                        
+                    } catch (error) {
+                        console.error(`❌ Error procesando panel ${panel.codigo}:`, error);
+                        errores++;
+                    }
+                }
+                
+                console.log('💾 Guardando registros en Firestore...');
+                
+                // Ejecutar todos los batches
+                for (let i = 0; i < batches.length; i++) {
+                    await batches[i].commit();
+                    console.log(`✅ Batch ${i + 1}/${batches.length} guardado`);
+                }
+                
+                // 3. Crear/actualizar billing_summary
+                console.log('📊 Actualizando billing_summary...');
+                const summaryDocRef = firebaseDB.collection('billing_summary').doc(monthKeyCompact);
+                await summaryDocRef.set({
+                    monthKey: monthKey,
+                    totalPanelesFacturables: conFacturacion,
+                    totalImporteMes: Math.round(totalImporteMes * 100) / 100,
+                    totalAcciones: conFacturacion,
+                    lastChangeAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastChangeBy: {
+                        uid: user.uid,
+                        email: user.email
+                    },
+                    migratedFrom: 'paneles_octubre_2025.json',
+                    migratedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                console.log('✅ billing_summary actualizado');
+                
+                // 4. Resumen final
+                const resultado = {
+                    totalProcesados: procesados,
+                    conFacturacion: conFacturacion,
+                    sinFacturacion: sinFacturacion,
+                    errores: errores,
+                    totalImporteMes: Math.round(totalImporteMes * 100) / 100,
+                    monthKey: monthKey
+                };
+                
+                console.log('✅ MIGRACIÓN COMPLETADA:');
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.log(`📊 Paneles procesados: ${resultado.totalProcesados}`);
+                console.log(`✅ Con facturación: ${resultado.conFacturacion}`);
+                console.log(`⚪ Sin facturación: ${resultado.sinFacturacion}`);
+                console.log(`❌ Errores: ${resultado.errores}`);
+                console.log(`💰 Importe total: ${formatEuro(resultado.totalImporteMes)}`);
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                
+                // Actualizar la UI
+                alert(`✅ MIGRACIÓN COMPLETADA\n\n` +
+                      `Paneles procesados: ${resultado.totalProcesados}\n` +
+                      `Con facturación: ${resultado.conFacturacion}\n` +
+                      `Sin facturación: ${resultado.sinFacturacion}\n` +
+                      `Errores: ${resultado.errores}\n\n` +
+                      `Importe total: ${formatEuro(resultado.totalImporteMes)}\n\n` +
+                      `Los datos ya están disponibles en la app.`);
+                
+                // Recargar datos
+                await updateTable();
+                await actualizarEstadisticas();
+                
+                return resultado;
+                
+            } catch (error) {
+                console.error('❌ ERROR EN MIGRACIÓN:', error);
+                alert(`❌ Error en migración:\n\n${error.message}\n\nRevisa la consola para más detalles.`);
+                throw error;
+            }
+        };
+        
         // Para ejecutar la migración desde la consola del navegador:
         // executeBillingSummaryMigration() - migra el mes actual
         // executeBillingSummaryMigration('202410') - migra octubre 2024
+        // migrateOctober2025FromJSON() - migra datos de octubre 2025 desde JSON
         
-    </script>
+        // ===== FUNCIÓN PARA RECALCULAR BILLING_SUMMARY DESDE DATOS REALES =====
+        
+        /**
+         * Recalcula billing_summary leyendo TODOS los panel_month_billing del mes
+         * 
+         * Esta función:
+         * 1. Lee TODOS los documentos de panel_month_billing para el mes especificado
+         * 2. Suma los importes y días REALES de cada panel
+         * 3. Cuenta paneles activos (30 días) y pausados (< 30 días)
+         * 4. Sobrescribe billing_summary con los datos correctos
+         * 
+         * USO:
+         * recalculateBillingSummary('2025-10')  // Para octubre 2025
+         * recalculateBillingSummary()           // Para el mes seleccionado en la UI
+         */
+        window.recalculateBillingSummary = async function(monthKey = null) {
+            console.log('🔄 Iniciando recálculo de billing_summary desde datos reales...');
+            
+            try {
+                // Verificar autenticación
+                if (!firebaseAuth.currentUser) {
+                    throw new Error('Debes estar autenticado para ejecutar el recálculo');
+                }
+                
+                const user = firebaseAuth.currentUser;
+                
+                // Si no se especifica monthKey, usar el mes seleccionado en la UI
+                if (!monthKey) {
+                    const month = parseInt(document.getElementById('currentMonth').value);
+                    const year = parseInt(document.getElementById('currentYear').value);
+                    monthKey = `${year}-${String(month).padStart(2, '0')}`;
+                }
+                
+                const monthKeyCompact = monthKey.replace('-', '');
+                
+                console.log(`📊 Recalculando billing_summary para ${monthKey}...`);
+                
+                // 1. Leer TODOS los panel_month_billing del mes
+                console.log('📦 Cargando TODOS los registros de panel_month_billing...');
+                const billingSnapshot = await firebaseDB.collection('panel_month_billing')
+                    .where('monthKey', '==', monthKey)
+                    .get();
+                
+                console.log(`✅ ${billingSnapshot.size} registros encontrados`);
+                
+                // 2. Calcular totales REALES
+                let totalImporteMes = 0;
+                let totalPanelesFacturables = 0;
+                let panelesActivos = 0;      // 30 días
+                let panelesPausados = 0;     // < 30 días
+                let totalDiasFacturables = 0;
+                let totalAcciones = 0;
+                
+                const detallesPaneles = [];
+                
+                billingSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    const panelId = data.panelId;
+                    const dias = data.totalDiasFacturables || 0;
+                    const importe = data.totalImporte || 0;
+                    
+                    // Acumular totales
+                    totalImporteMes += importe;
+                    totalDiasFacturables += dias;
+                    totalPanelesFacturables++;
+                    
+                    // Clasificar paneles
+                    if (dias >= 30) {
+                        panelesActivos++;
+                    } else if (dias > 0 && dias < 30) {
+                        panelesPausados++;
+                    }
+                    
+                    // Contar acciones
+                    const acciones = data.acciones || {};
+                    totalAcciones += Object.values(acciones).reduce((sum, count) => sum + count, 0);
+                    
+                    // Guardar detalles para logging
+                    detallesPaneles.push({
+                        panelId,
+                        dias,
+                        importe: Math.round(importe * 100) / 100
+                    });
+                });
+                
+                // Redondear importe total
+                totalImporteMes = Math.round(totalImporteMes * 100) / 100;
+                
+                // 3. Mostrar detalles en consola
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.log('📊 DATOS REALES CALCULADOS:');
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.log(`Total paneles facturables: ${totalPanelesFacturables}`);
+                console.log(`  ├─ Activos (30 días): ${panelesActivos}`);
+                console.log(`  └─ Pausados (< 30 días): ${panelesPausados}`);
+                console.log(`Total días facturables: ${totalDiasFacturables}`);
+                console.log(`Total importe mes: ${formatEuro(totalImporteMes)}`);
+                console.log(`Total acciones: ${totalAcciones}`);
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                
+                // Mostrar primeros 10 paneles como muestra
+                console.log('\n📋 Muestra de paneles (primeros 10):');
+                detallesPaneles.slice(0, 10).forEach(p => {
+                    console.log(`  Panel ${p.panelId}: ${p.dias} días → ${formatEuro(p.importe)}`);
+                });
+                if (detallesPaneles.length > 10) {
+                    console.log(`  ... y ${detallesPaneles.length - 10} paneles más\n`);
+                }
+                
+                // 4. Actualizar billing_summary con datos CORRECTOS
+                console.log('💾 Actualizando billing_summary con datos recalculados...');
+                const summaryDocRef = firebaseDB.collection('billing_summary').doc(monthKeyCompact);
+                
+                await summaryDocRef.set({
+                    monthKey: monthKey,
+                    totalPanelesFacturables: totalPanelesFacturables,
+                    totalImporteMes: totalImporteMes,
+                    totalDiasFacturables: totalDiasFacturables,
+                    totalAcciones: totalAcciones,
+                    panelesActivos: panelesActivos,
+                    panelesPausados: panelesPausados,
+                    lastChangeAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastChangeBy: {
+                        uid: user.uid,
+                        email: user.email
+                    },
+                    recalculatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    recalculatedBy: {
+                        uid: user.uid,
+                        email: user.email
+                    }
+                });
+                
+                console.log('✅ billing_summary actualizado correctamente');
+                
+                // 5. Resultado final
+                const resultado = {
+                    monthKey: monthKey,
+                    totalPanelesFacturables: totalPanelesFacturables,
+                    panelesActivos: panelesActivos,
+                    panelesPausados: panelesPausados,
+                    totalDiasFacturables: totalDiasFacturables,
+                    totalImporteMes: totalImporteMes,
+                    totalAcciones: totalAcciones
+                };
+                
+                console.log('\n✅ RECÁLCULO COMPLETADO:');
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.log(`Mes: ${monthKey}`);
+                console.log(`Total facturación: ${formatEuro(totalImporteMes)}`);
+                console.log(`Paneles: ${totalPanelesFacturables}`);
+                console.log(`  ├─ Activos: ${panelesActivos}`);
+                console.log(`  └─ Pausados: ${panelesPausados}`);
+                console.log(`Total días: ${totalDiasFacturables}`);
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+                
+                // Mostrar alerta con resumen
+                alert(`✅ RECÁLCULO COMPLETADO\n\n` +
+                      `Mes: ${monthKey}\n\n` +
+                      `Total facturación: ${formatEuro(totalImporteMes)}\n` +
+                      `Paneles: ${totalPanelesFacturables}\n` +
+                      `  • Activos: ${panelesActivos}\n` +
+                      `  • Pausados: ${panelesPausados}\n\n` +
+                      `Los datos del dashboard se actualizarán automáticamente.`);
+                
+                // 6. Actualizar la UI
+                console.log('🔄 Actualizando interfaz...');
+                await actualizarEstadisticas();
+                
+                return resultado;
+                
+            } catch (error) {
+                console.error('❌ ERROR EN RECÁLCULO:', error);
+                alert(`❌ Error en recálculo:\n\n${error.message}\n\nRevisa la consola para más detalles.`);
+                throw error;
+            }
+        };
+        
+        // ===== FUNCIÓN PARA REGENERAR panel_month_billing DESDE CSV CORRECTO =====
+        
+        /**
+         * Regenera TODOS los panel_month_billing de octubre 2025 desde el CSV correcto
+         * 
+         * Esta función:
+         * 1. Lee el archivo CSV con días y facturación EXACTOS
+         * 2. Sobrescribe TODOS los panel_month_billing con datos correctos
+         * 3. Recalcula billing_summary con los totales correctos
+         * 
+         * IMPORTANTE: 
+         * - El CSV debe estar en: /Documentos Descargados App/paneles_10_2025.csv
+         * - Debe tener las columnas: Municipio, Código Parada, Días, Facturación
+         * - Sobrescribirá los datos existentes
+         * 
+         * USO:
+         * regenerateFromCorrectCSV()
+         */
+        window.regenerateFromCorrectCSV = async function() {
+            console.log('🔄 Iniciando regeneración desde CSV correcto...');
+            
+            try {
+                // Verificar autenticación
+                if (!firebaseAuth.currentUser) {
+                    throw new Error('Debes estar autenticado para ejecutar la regeneración');
+                }
+                
+                const user = firebaseAuth.currentUser;
+                const monthKey = '2025-10';
+                const monthKeyCompact = '202510';
+                
+                // 1. Leer el CSV correcto
+                console.log('📦 Cargando CSV correcto...');
+                
+                // Leer desde la carpeta public
+                const response = await fetch('./paneles_10_2025.csv');
+                const csvText = await response.text();
+                
+                console.log('✅ CSV cargado, parseando datos...');
+                
+                // Parsear CSV con mejor manejo de espacios y encoding
+                const lines = csvText.trim().split('\n').map(line => line.trim());
+                const headers = lines[0].split(',').map(h => h.trim());
+                
+                // Verificar estructura
+                console.log('📋 Columnas encontradas:', headers);
+                
+                const panelesCSV = [];
+                let erroresParseo = 0;
+                
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i];
+                    if (!line) continue; // Saltar líneas vacías
+                    
+                    // Split por coma pero manteniendo valores
+                    const values = line.split(',').map(v => v.trim());
+                    
+                    if (values.length >= 4) {
+                        const municipio = values[0];
+                        let codigo = values[1];
+                        const diasStr = values[2];
+                        const facturacionStr = values[3];
+                        
+                        // Limpiar código (remover espacios y paréntesis tipo "9657 (48)")
+                        codigo = codigo.replace(/\s*\([^)]*\)\s*/g, '').trim();
+                        
+                        // Parsear números con manejo robusto
+                        const dias = parseInt(diasStr.replace(/\s/g, ''));
+                        const facturacion = parseFloat(facturacionStr.replace(',', '.').replace(/\s/g, ''));
+                        
+                        if (codigo && !isNaN(dias) && !isNaN(facturacion) && dias > 0) {
+                            panelesCSV.push({
+                                municipio,
+                                codigo,
+                                dias,
+                                facturacion
+                            });
+                        } else {
+                            erroresParseo++;
+                            console.warn(`⚠️ Línea ${i}: Error parseando - codigo="${codigo}", dias="${diasStr}", facturacion="${facturacionStr}"`);
+                        }
+                    } else {
+                        erroresParseo++;
+                        console.warn(`⚠️ Línea ${i}: Formato incorrecto - ${line}`);
+                    }
+                }
+                
+                if (erroresParseo > 0) {
+                    console.warn(`⚠️ Total errores de parseo: ${erroresParseo}`);
+                }
+                
+                console.log(`✅ ${panelesCSV.length} paneles parseados desde CSV`);
+                
+                // Mostrar muestra
+                console.log('\n📋 Muestra de datos (primeros 5):');
+                panelesCSV.slice(0, 5).forEach(p => {
+                    console.log(`  ${p.municipio} - Panel ${p.codigo}: ${p.dias} días → ${p.facturacion}€`);
+                });
+                console.log('');
+                
+                // 2. Confirmar con el usuario
+                const confirmacion = confirm(
+                    `⚠️ REGENERACIÓN DESDE CSV CORRECTO\n\n` +
+                    `Se van a SOBRESCRIBIR ${panelesCSV.length} registros de panel_month_billing\n` +
+                    `con los datos correctos del CSV.\n\n` +
+                    `Mes: Octubre 2025\n` +
+                    `Archivo: paneles_10_2025.csv\n\n` +
+                    `¿Deseas continuar?`
+                );
+                
+                if (!confirmacion) {
+                    console.log('❌ Regeneración cancelada por el usuario');
+                    return { cancelled: true };
+                }
+                
+                // 3. Procesar cada panel
+                let procesados = 0;
+                let actualizados = 0;
+                let errores = 0;
+                let totalImporteMes = 0;
+                let totalDiasFacturables = 0;
+                let panelesActivos = 0;
+                let panelesPausados = 0;
+                
+                const batch = firebaseDB.batch();
+                const batchSize = 500;
+                let batchCount = 0;
+                let batches = [batch];
+                
+                for (const panel of panelesCSV) {
+                    try {
+                        const panelId = String(panel.codigo).trim();
+                        const dias = panel.dias;
+                        const importe = panel.facturacion;
+                        
+                        // Solo crear registro si hay facturación
+                        if (dias > 0 && importe > 0) {
+                            const billingDocId = `${panelId}_${monthKeyCompact}`;
+                            const billingDocRef = firebaseDB.collection('panel_month_billing').doc(billingDocId);
+                            
+                            // Sobrescribir con datos CORRECTOS del CSV
+                            const currentBatch = batches[batches.length - 1];
+                            currentBatch.set(billingDocRef, {
+                                panelId: panelId,
+                                monthKey: monthKey,
+                                totalDiasFacturables: dias,
+                                totalImporte: importe,
+                                acciones: {
+                                    REGENERACION_CSV: 1
+                                },
+                                lastChangeAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                lastChangeBy: {
+                                    uid: user.uid,
+                                    email: user.email
+                                },
+                                regeneratedFrom: 'paneles_10_2025.csv',
+                                regeneratedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                municipio: panel.municipio
+                            }, { merge: false }); // merge: false para sobrescribir completamente
+                            
+                            batchCount++;
+                            
+                            // Crear nuevo batch si alcanzamos el límite
+                            if (batchCount >= batchSize) {
+                                batches.push(firebaseDB.batch());
+                                batchCount = 0;
+                            }
+                            
+                            actualizados++;
+                            totalImporteMes += importe;
+                            totalDiasFacturables += dias;
+                            
+                            // Clasificar
+                            if (dias >= 30) {
+                                panelesActivos++;
+                            } else if (dias > 0) {
+                                panelesPausados++;
+                            }
+                        }
+                        
+                        procesados++;
+                        
+                        // Log de progreso cada 50 paneles
+                        if (procesados % 50 === 0) {
+                            console.log(`📊 Progreso: ${procesados}/${panelesCSV.length} paneles procesados`);
+                        }
+                        
+                    } catch (error) {
+                        console.error(`❌ Error procesando panel ${panel.codigo}:`, error);
+                        errores++;
+                    }
+                }
+                
+                console.log('💾 Guardando registros CORREGIDOS en Firestore...');
+                
+                // Ejecutar todos los batches
+                for (let i = 0; i < batches.length; i++) {
+                    await batches[i].commit();
+                    console.log(`✅ Batch ${i + 1}/${batches.length} guardado`);
+                }
+                
+                // 4. Actualizar billing_summary con datos CORRECTOS
+                console.log('📊 Actualizando billing_summary con datos corregidos...');
+                
+                totalImporteMes = Math.round(totalImporteMes * 100) / 100;
+                
+                const summaryDocRef = firebaseDB.collection('billing_summary').doc(monthKeyCompact);
+                await summaryDocRef.set({
+                    monthKey: monthKey,
+                    totalPanelesFacturables: actualizados,
+                    totalImporteMes: totalImporteMes,
+                    totalDiasFacturables: totalDiasFacturables,
+                    totalAcciones: actualizados,
+                    panelesActivos: panelesActivos,
+                    panelesPausados: panelesPausados,
+                    lastChangeAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastChangeBy: {
+                        uid: user.uid,
+                        email: user.email
+                    },
+                    regeneratedFrom: 'paneles_10_2025.csv',
+                    regeneratedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                console.log('✅ billing_summary actualizado');
+                
+                // 5. Resumen final
+                const resultado = {
+                    totalProcesados: procesados,
+                    actualizados: actualizados,
+                    errores: errores,
+                    totalImporteMes: totalImporteMes,
+                    totalDiasFacturables: totalDiasFacturables,
+                    panelesActivos: panelesActivos,
+                    panelesPausados: panelesPausados,
+                    monthKey: monthKey
+                };
+                
+                console.log('\n✅ REGENERACIÓN COMPLETADA:');
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.log(`📊 Paneles procesados: ${resultado.totalProcesados}`);
+                console.log(`✅ Actualizados: ${resultado.actualizados}`);
+                console.log(`  ├─ Activos (30 días): ${resultado.panelesActivos}`);
+                console.log(`  └─ Pausados (< 30 días): ${resultado.panelesPausados}`);
+                console.log(`❌ Errores: ${resultado.errores}`);
+                console.log(`💰 Importe total: ${formatEuro(resultado.totalImporteMes)}`);
+                console.log(`📅 Días totales: ${resultado.totalDiasFacturables}`);
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+                
+                // Alerta con resumen
+                alert(`✅ REGENERACIÓN COMPLETADA\n\n` +
+                      `Paneles actualizados: ${resultado.actualizados}\n` +
+                      `  • Activos: ${resultado.panelesActivos}\n` +
+                      `  • Pausados: ${resultado.panelesPausados}\n\n` +
+                      `Total facturación: ${formatEuro(resultado.totalImporteMes)}\n` +
+                      `Total días: ${resultado.totalDiasFacturables}\n\n` +
+                      `Errores: ${resultado.errores}\n\n` +
+                      `Los datos correctos ya están en Firestore.`);
+                
+                // 6. Actualizar la UI
+                console.log('🔄 Actualizando interfaz...');
+                await updateTable();
+                await actualizarEstadisticas();
+                
+                return resultado;
+                
+            } catch (error) {
+                console.error('❌ ERROR EN REGENERACIÓN:', error);
+                alert(`❌ Error en regeneración:\n\n${error.message}\n\nRevisa la consola para más detalles.`);
+                throw error;
+            }
+        };
+        
+        // ===== FUNCIÓN PARA GENERAR FACTURACIÓN COMPLETA DESDE FIRESTORE =====
+        
+        /**
+         * Genera facturación de octubre 2025 con LÓGICA CORRECTA:
+         * 
+         * Para CADA panel en Firestore:
+         * 1. Lee el panel de la colección paneles
+         * 2. Verifica si tiene eventos en paneles/{id}/changes para octubre 2025
+         * 3. Decide facturación:
+         *    - SI tiene eventos → usa diasFacturables e importeAFacturar del evento
+         *    - SI NO tiene eventos → calcula mes completo (30 días × 37.70€)
+         * 4. Crea/actualiza panel_month_billing
+         * 5. Recalcula billing_summary
+         * 
+         * USO:
+         * generateCompleteBillingFromFirestore()
+         * 
+         * @version 2025-11-07-v2
+         */
+        window.generateCompleteBillingFromFirestore = async function() {
+            console.log('🔄 Generando facturación completa desde Firestore con lógica correcta...');
+            console.log('📌 Versión: 2025-11-07-v2');
+            
+            try {
+                // Verificar autenticación
+                if (!firebaseAuth.currentUser) {
+                    throw new Error('Debes estar autenticado para ejecutar esta función');
+                }
+                
+                const user = firebaseAuth.currentUser;
+                const monthKey = '2025-10';
+                const monthKeyCompact = '202510';
+                const TARIFA_BASE = 37.70;
+                const DIAS_MES_COMPLETO = 30;
+                
+                console.log(`📊 Procesando facturación para ${monthKey}...`);
+                
+                // 1. Obtener TODOS los paneles de la colección paneles
+                console.log('📦 Cargando TODOS los paneles desde Firestore...');
+                const panelesSnapshot = await firebaseDB.collection('paneles').get();
+                
+                console.log(`✅ ${panelesSnapshot.size} paneles encontrados en Firestore`);
+                
+                // 2. Procesar cada panel
+                let procesados = 0;
+                let conEventos = 0;
+                let sinEventos = 0;
+                let errores = 0;
+                let totalImporteMes = 0;
+                let totalDiasFacturables = 0;
+                let panelesActivos = 0;
+                let panelesPausados = 0;
+                
+                const batch = firebaseDB.batch();
+                const batchSize = 500;
+                let batchCount = 0;
+                let batches = [batch];
+                
+                const detallesProcesamiento = [];
+                
+                for (const panelDoc of panelesSnapshot.docs) {
+                    try {
+                        const panelData = panelDoc.data();
+                        const panelId = String(panelData.codigo || panelDoc.id).trim();
+                        
+                        // 2.1. Buscar eventos del panel en octubre 2025
+                        const changesSnapshot = await panelDoc.ref
+                            .collection('changes')
+                            .where('monthKey', '==', monthKey)
+                            .get();
+                        
+                        let dias = 0;
+                        let importe = 0;
+                        let tieneEventos = false;
+                        let accionesRegistradas = {};
+                        
+                        if (!changesSnapshot.empty) {
+                            // ✅ TIENE EVENTOS - Usar datos del evento
+                            tieneEventos = true;
+                            
+                            // Sumar todos los eventos del mes (puede haber múltiples)
+                            changesSnapshot.forEach(changeDoc => {
+                                const changeData = changeDoc.data();
+                                dias += changeData.diasFacturables || 0;
+                                importe += changeData.importeAFacturar || 0;
+                                
+                                // Registrar acciones
+                                const action = changeData.action;
+                                if (action) {
+                                    accionesRegistradas[action] = (accionesRegistradas[action] || 0) + 1;
+                                }
+                            });
+                            
+                            conEventos++;
+                            
+                            detallesProcesamiento.push({
+                                panelId,
+                                tipo: 'CON_EVENTOS',
+                                eventos: changesSnapshot.size,
+                                dias,
+                                importe: Math.round(importe * 100) / 100
+                            });
+                            
+                        } else {
+                            // ⚪ NO TIENE EVENTOS - Mes completo
+                            tieneEventos = false;
+                            dias = DIAS_MES_COMPLETO;
+                            importe = TARIFA_BASE;
+                            accionesRegistradas = { MES_COMPLETO_SIN_EVENTOS: 1 };
+                            
+                            sinEventos++;
+                            
+                            detallesProcesamiento.push({
+                                panelId,
+                                tipo: 'SIN_EVENTOS',
+                                dias,
+                                importe
+                            });
+                        }
+                        
+                        // Redondear importe
+                        importe = Math.round(importe * 100) / 100;
+                        
+                        // 2.2. Crear/actualizar panel_month_billing
+                        if (dias > 0) {
+                            const billingDocId = `${panelId}_${monthKeyCompact}`;
+                            const billingDocRef = firebaseDB.collection('panel_month_billing').doc(billingDocId);
+                            
+                            const currentBatch = batches[batches.length - 1];
+                            currentBatch.set(billingDocRef, {
+                                panelId: panelId,
+                                monthKey: monthKey,
+                                totalDiasFacturables: dias,
+                                totalImporte: importe,
+                                acciones: accionesRegistradas,
+                                tieneEventos: tieneEventos,
+                                lastChangeAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                lastChangeBy: {
+                                    uid: user.uid,
+                                    email: user.email
+                                },
+                                generatedFrom: 'firestore_complete_logic',
+                                generatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                municipio: panelData.municipio || null
+                            });
+                            
+                            batchCount++;
+                            
+                            // Crear nuevo batch si es necesario
+                            if (batchCount >= batchSize) {
+                                batches.push(firebaseDB.batch());
+                                batchCount = 0;
+                            }
+                            
+                            totalImporteMes += importe;
+                            totalDiasFacturables += dias;
+                            
+                            // Clasificar
+                            if (dias >= 30) {
+                                panelesActivos++;
+                            } else if (dias > 0) {
+                                panelesPausados++;
+                            }
+                        }
+                        
+                        procesados++;
+                        
+                        // Log de progreso cada 50 paneles
+                        if (procesados % 50 === 0) {
+                            console.log(`📊 Progreso: ${procesados}/${panelesSnapshot.size} paneles | Con eventos: ${conEventos} | Sin eventos: ${sinEventos}`);
+                        }
+                        
+                    } catch (error) {
+                        console.error(`❌ Error procesando panel ${panelDoc.id}:`, error);
+                        errores++;
+                    }
+                }
+                
+                console.log('\n💾 Guardando TODOS los registros en Firestore...');
+                
+                // Ejecutar todos los batches
+                for (let i = 0; i < batches.length; i++) {
+                    await batches[i].commit();
+                    console.log(`✅ Batch ${i + 1}/${batches.length} guardado`);
+                }
+                
+                // 3. Actualizar billing_summary
+                console.log('📊 Actualizando billing_summary...');
+                
+                totalImporteMes = Math.round(totalImporteMes * 100) / 100;
+                const totalPaneles = panelesActivos + panelesPausados;
+                
+                const summaryDocRef = firebaseDB.collection('billing_summary').doc(monthKeyCompact);
+                await summaryDocRef.set({
+                    monthKey: monthKey,
+                    totalPanelesFacturables: totalPaneles,
+                    totalImporteMes: totalImporteMes,
+                    totalDiasFacturables: totalDiasFacturables,
+                    totalAcciones: conEventos + sinEventos,
+                    panelesActivos: panelesActivos,
+                    panelesPausados: panelesPausados,
+                    panelesConEventos: conEventos,
+                    panelesSinEventos: sinEventos,
+                    lastChangeAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastChangeBy: {
+                        uid: user.uid,
+                        email: user.email
+                    },
+                    generatedFrom: 'firestore_complete_logic',
+                    generatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                console.log('✅ billing_summary actualizado');
+                
+                // 4. Mostrar resumen
+                console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.log('📊 RESUMEN DE PROCESAMIENTO:');
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.log(`Total paneles procesados: ${procesados}`);
+                console.log(`  ├─ Con eventos registrados: ${conEventos}`);
+                console.log(`  └─ Sin eventos (mes completo): ${sinEventos}`);
+                console.log(`\nTotal paneles facturables: ${totalPaneles}`);
+                console.log(`  ├─ Activos (30 días): ${panelesActivos}`);
+                console.log(`  └─ Pausados (< 30 días): ${panelesPausados}`);
+                console.log(`\nTotal facturación: ${formatEuro(totalImporteMes)}`);
+                console.log(`Total días: ${totalDiasFacturables}`);
+                console.log(`Errores: ${errores}`);
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+                
+                // Mostrar muestra de paneles procesados
+                console.log('📋 Muestra de paneles procesados (primeros 10):');
+                detallesProcesamiento.slice(0, 10).forEach(p => {
+                    const tipo = p.tipo === 'CON_EVENTOS' ? '✅ CON EVENTOS' : '⚪ SIN EVENTOS';
+                    const eventos = p.eventos ? ` (${p.eventos} eventos)` : '';
+                    console.log(`  ${tipo} - Panel ${p.panelId}${eventos}: ${p.dias} días → ${formatEuro(p.importe)}`);
+                });
+                if (detallesProcesamiento.length > 10) {
+                    console.log(`  ... y ${detallesProcesamiento.length - 10} paneles más\n`);
+                }
+                
+                // Resultado
+                const resultado = {
+                    totalProcesados: procesados,
+                    conEventos: conEventos,
+                    sinEventos: sinEventos,
+                    totalPanelesFacturables: totalPaneles,
+                    panelesActivos: panelesActivos,
+                    panelesPausados: panelesPausados,
+                    totalImporteMes: totalImporteMes,
+                    totalDiasFacturables: totalDiasFacturables,
+                    errores: errores,
+                    monthKey: monthKey
+                };
+                
+                // Alerta
+                alert(`✅ FACTURACIÓN COMPLETA GENERADA\n\n` +
+                      `Total paneles: ${procesados}\n` +
+                      `  • Con eventos: ${conEventos}\n` +
+                      `  • Sin eventos (mes completo): ${sinEventos}\n\n` +
+                      `Facturables: ${totalPaneles}\n` +
+                      `  • Activos: ${panelesActivos}\n` +
+                      `  • Pausados: ${panelesPausados}\n\n` +
+                      `Total facturación: ${formatEuro(totalImporteMes)}\n` +
+                      `Total días: ${totalDiasFacturables}\n\n` +
+                      `Errores: ${errores}`);
+                
+                // Actualizar UI
+                console.log('🔄 Actualizando interfaz...');
+                await updateTable();
+                await actualizarEstadisticas();
+                
+                return resultado;
+                
+            } catch (error) {
+                console.error('❌ ERROR:', error);
+                alert(`❌ Error generando facturación:\n\n${error.message}\n\nRevisa la consola.`);
+                throw error;
+            }
+        };
+        
+        // ===== FUNCIÓN DE CÁLCULO DINÁMICO DE FACTURACIÓN =====
+        
+        /**
+         * Calcula facturación de cualquier mes de forma DINÁMICA
+         * 
+         * LÓGICA:
+         * 1. Determina el mes base (mes anterior al consultado)
+         * 2. Obtiene la facturación base desde Firestore
+         * 3. Calcula eventos del mes consultado en TIEMPO REAL
+         * 4. Aplica ajustes proporcionales (precio diario: 1.2567€)
+         * 5. Retorna resultado SIN guardarlo (solo lectura)
+         * 
+         * CARACTERÍSTICAS:
+         * - NO modifica datos en Firestore
+         * - Calcula cada vez que se consulta
+         * - Funciona para presente y futuro
+         * - Usa caché inteligente para meses cerrados
+         * 
+         * @param {string} monthKey - Mes a calcular (formato: 'YYYY-MM')
+         * @returns {Object} Resultado con totales y desglose
+         */
+        window.calcularFacturacionDinamica = async function(monthKey) {
+            console.log('🧮 CÁLCULO DINÁMICO DE FACTURACIÓN');
+            console.log(`📅 Mes consultado: ${monthKey}\n`);
+            
+            try {
+                const TARIFA_BASE = 37.70;
+                const DIAS_MES_COMPLETO = 30;
+                const monthKeyCompact = monthKey.replace('-', '');
+                
+                // 1. INTENTAR LEER DESDE panel_month_billing (datos ya calculados)
+                console.log('📦 Buscando datos en panel_month_billing...');
+                
+                const billingSnapshot = await firebaseDB.collection('panel_month_billing')
+                    .where('monthKey', '==', monthKey)
+                    .get();
+                
+                if (!billingSnapshot.empty) {
+                    // HAY DATOS CALCULADOS - Usarlos directamente
+                    console.log(`✅ Encontrados ${billingSnapshot.size} registros en panel_month_billing`);
+                    
+                    // CALCULAR MES ANTERIOR para facturación incremental
+                    const [year, month] = monthKey.split('-').map(Number);
+                    const mesAnterior = month === 1 ? 12 : month - 1;
+                    const yearAnterior = month === 1 ? year - 1 : year;
+                    const monthKeyAnterior = `${yearAnterior}-${String(mesAnterior).padStart(2, '0')}`;
+                    
+                    console.log(`📅 Mes base: ${monthKeyAnterior}`);
+                    
+                    // Leer facturación del mes anterior
+                    const billingAnteriorSnapshot = await firebaseDB.collection('panel_month_billing')
+                        .where('monthKey', '==', monthKeyAnterior)
+                        .get();
+                    
+                    const factAnterior = {};
+                    let baseImporteTotal = 0;
+                    
+                    if (!billingAnteriorSnapshot.empty) {
+                        billingAnteriorSnapshot.docs.forEach(doc => {
+                            const data = doc.data();
+                            factAnterior[data.panelId] = {
+                                dias: data.totalDiasFacturables || 0,
+                                importe: data.totalImporte || 0
+                            };
+                            baseImporteTotal += data.totalImporte || 0;
+                        });
+                        console.log(`✅ Base cargada: ${billingAnteriorSnapshot.size} paneles, ${baseImporteTotal.toFixed(2)}€`);
+                    } else {
+                        console.log('⚠️ No hay datos del mes anterior');
+                    }
+                    
+                    let totalDiferencia = 0; // Suma de todas las diferencias
+                    let totalDias = 0;
+                    let eventosAplicados = 0;
+                    const desglose = [];
+                    const panelesConEventos = new Set(); // Paneles que tienen eventos en el mes actual
+                    
+                    billingSnapshot.docs.forEach(doc => {
+                        const data = doc.data();
+                        const panelId = data.panelId;
+                        const diasNuevos = data.totalDiasFacturables || 0;
+                        const importeNuevo = data.totalImporte || 0;
+                        
+                        totalDias += diasNuevos;
+                        panelesConEventos.add(panelId);
+                        
+                        // Comparar con mes anterior
+                        const base = factAnterior[panelId] || { dias: 0, importe: 0 };
+                        const diferenciaDias = diasNuevos - base.dias;
+                        const diferenciaImporte = importeNuevo - base.importe;
+                        const numEventos = data.acciones ? Object.values(data.acciones).reduce((a, b) => a + b, 0) : 0;
+                        
+                        // SUMAR LA DIFERENCIA (no el importe nuevo)
+                        totalDiferencia += diferenciaImporte;
+                        
+                        if (numEventos > 0) {
+                            eventosAplicados += numEventos;
+                        }
+                        
+                        // Agregar al desglose si hay cambios
+                        if (Math.abs(diferenciaDias) > 0 || Math.abs(diferenciaImporte) > 0.01) {
+                            desglose.push({
+                                panelId: panelId,
+                                municipio: data.municipio || '',
+                                eventos: numEventos,
+                                diasBase: base.dias,
+                                diasNuevos: diasNuevos,
+                                diferenciaDias: diferenciaDias,
+                                importeBase: base.importe,
+                                importeNuevo: importeNuevo,
+                                diferenciaImporte: diferenciaImporte
+                            });
+                        }
+                    });
+                    
+                    // CONTAR PANELES: Base + paneles nuevos - paneles eliminados
+                    // Para simplificar: tomamos todos los paneles únicos entre anterior y actual
+                    const todosLosPaneles = new Set([...Object.keys(factAnterior), ...panelesConEventos]);
+                    
+                    // Contar activos y pausados considerando el estado FINAL (mes actual)
+                    let panelesActivos = 0;
+                    let panelesPausados = 0;
+                    
+                    todosLosPaneles.forEach(panelId => {
+                        // Si tiene evento en mes actual, usar ese valor
+                        const diasFinales = panelesConEventos.has(panelId) 
+                            ? (billingSnapshot.docs.find(d => d.data().panelId === panelId)?.data().totalDiasFacturables || 0)
+                            : (factAnterior[panelId]?.dias || 0); // Si no tiene evento, mantiene días del mes anterior
+                        
+                        if (diasFinales >= 30) {
+                            panelesActivos++;
+                        } else if (diasFinales > 0) {
+                            panelesPausados++;
+                        }
+                    });
+                    
+                    // TOTAL = BASE + DIFERENCIA (no suma de importes nuevos)
+                    baseImporteTotal = Math.round(baseImporteTotal * 100) / 100;
+                    totalDiferencia = Math.round(totalDiferencia * 100) / 100;
+                    const totalImporte = Math.round((baseImporteTotal + totalDiferencia) * 100) / 100;
+                    
+                    console.log('✅ Datos cargados desde panel_month_billing');
+                    console.log(`   Base ${monthKeyAnterior}: ${baseImporteTotal.toFixed(2)}€`);
+                    console.log(`   Eventos aplicados: ${eventosAplicados}`);
+                    console.log(`   Diferencia: ${totalDiferencia >= 0 ? '+' : ''}${totalDiferencia.toFixed(2)}€`);
+                    console.log(`   Total ${monthKey}: ${totalImporte.toFixed(2)}€ (${baseImporteTotal.toFixed(2)} + ${totalDiferencia.toFixed(2)})`);
+                    console.log(`   Paneles totales: ${todosLosPaneles.size} (${panelesActivos} activos, ${panelesPausados} pausados)`);
+                    
+                    return {
+                        monthKey: monthKey,
+                        mesBase: monthKeyAnterior,
+                        baseImporte: baseImporteTotal,
+                        totalImporte: totalImporte,
+                        diferencia: totalDiferencia,
+                        eventosAplicados: eventosAplicados,
+                        totalPaneles: todosLosPaneles.size,
+                        panelesActivos: panelesActivos,
+                        panelesPausados: panelesPausados,
+                        totalDias: totalDias,
+                        fromCache: false,
+                        fromDatabase: true,
+                        desglose: desglose
+                    };
+                }
+                
+                // 2. NO HAY DATOS - Verificar si hay billing_summary (legacy)
+                console.log('⚠️ No hay datos en panel_month_billing');
+                
+                const summaryDoc = await firebaseDB.collection('billing_summary').doc(monthKeyCompact).get();
+                
+                if (summaryDoc.exists) {
+                    console.log('� Usando datos de billing_summary (legacy)');
+                    const data = summaryDoc.data();
+                    return {
+                        monthKey: monthKey,
+                        totalImporte: data.totalImporteMes || 0,
+                        totalPaneles: data.totalPanelesFacturables || 0,
+                        panelesActivos: data.panelesActivos || 0,
+                        panelesPausados: data.panelesPausados || 0,
+                        totalDias: data.totalDiasFacturables || 0,
+                        fromCache: true,
+                        fromDatabase: false,
+                        desglose: []
+                    };
+                }
+                
+                // 3. NO HAY DATOS NI EN panel_month_billing NI EN billing_summary
+                console.warn(`❌ No hay datos de facturación para ${monthKey}`);
+                console.warn('   Necesitas generar la facturación primero usando:');
+                console.warn(`   generarFacturacionIncremental('${monthKey}', 'MES_ANTERIOR')`);
+                
+                return {
+                    monthKey: monthKey,
+                    totalImporte: 0,
+                    totalPaneles: 0,
+                    panelesActivos: 0,
+                    panelesPausados: 0,
+                    totalDias: 0,
+                    fromCache: false,
+                    fromDatabase: false,
+                    sinDatos: true,
+                    desglose: []
+                };
+                
+            } catch (error) {
+                console.error('❌ ERROR en cálculo dinámico:', error);
+                throw error;
+            }
+        };
+        
+    </script>    </script>
 
         <!-- ============================================
              BOTñN FLOTANTE MINIMALISTA
