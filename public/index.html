@@ -163,6 +163,7 @@
               id: doc.id,
               municipio: data.municipio,
               codigo: data.codigo,
+              tarifa: data.tarifa || 37.70,
               fechaInstalacion: data.fechaInstalacion,
               fechaDesmontaje: data.fechaDesmontaje,
               estado: data.estado || (data.fechaDesmontaje ? 'desmontado' : 'activo'),
@@ -368,21 +369,22 @@
            ============================================ */
         .minimal-stats {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
+            grid-template-columns: 0.9fr 0.9fr 1.3fr 0.9fr;
+            gap: 14px;
             margin-bottom: var(--space-2xl);
+            max-width: 100%;
         }
 
         .minimal-stat-card {
             background: var(--white);
             border: 1px solid var(--border-color);
             border-radius: var(--border-radius);
-            padding: 28px;
+            padding: 22px 18px;
             transition: all 0.2s ease;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            min-height: 180px;
+            min-height: 160px;
         }
 
         .minimal-stat-card:hover {
@@ -391,26 +393,26 @@
         }
 
         .minimal-stat-label {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             color: var(--gray);
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .minimal-stat-value {
-            font-size: 56px;
+            font-size: 48px;
             font-weight: 700;
             color: var(--black);
             line-height: 1.1;
-            letter-spacing: -1.5px;
+            letter-spacing: -1.2px;
             margin-bottom: 8px;
             word-break: break-word;
         }
 
         .minimal-stat-detail {
-            font-size: 15px;
+            font-size: 14px;
             color: var(--gray);
             font-weight: 500;
         }
@@ -1239,13 +1241,15 @@
         }
 
         .btn-primary {
-            background: var(--blue);
-            color: var(--white);
+            background: var(--white);
+            color: var(--black);
+            border: 1px solid var(--border-color);
         }
 
         .btn-primary:hover:not(:disabled) {
-            background: #1D4ED8;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+            background: var(--gray-lighter);
+            border-color: var(--gray);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
 
         .btn-secondary {
@@ -1255,8 +1259,9 @@
         }
 
         .btn-secondary:hover:not(:disabled) {
-            background: var(--background);
+            background: var(--gray-lighter);
             border-color: var(--gray);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
 
         .btn-success {
@@ -1779,13 +1784,21 @@
             font-weight: 500;
         }
 
-        @media (max-width: 1024px) {
+        @media (max-width: 1200px) {
             .minimal-stats {
                 grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+            }
+            .minimal-stat-card {
+                min-height: 150px;
+                padding: 20px 16px;
             }
             .minimal-stat-value {
-                font-size: 40px;
+                font-size: 42px;
             }
+        }
+
+        @media (max-width: 1024px) {
             .minimal-section-header {
                 flex-direction: column;
                 align-items: flex-start;
@@ -1822,16 +1835,16 @@
             
             .minimal-stats {
                 grid-template-columns: 1fr;
-                gap: 16px;
+                gap: 12px;
             }
             
             .minimal-stat-value {
-                font-size: 44px;
+                font-size: 40px;
             }
             
             .minimal-stat-card {
-                padding: 24px;
-                min-height: 160px;
+                padding: 20px 16px;
+                min-height: 140px;
             }
             
             .minimal-section-header {
@@ -1929,16 +1942,16 @@
 
         /* Estilos para botón principal de Cambios del mes */
         .btn-primary-large {
-            background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
-            color: white;
-            border: none;
+            background: var(--white);
+            color: var(--black);
+            border: 1px solid var(--border-color);
             padding: 16px 32px;
             font-size: 16px;
             font-weight: 600;
             border-radius: 10px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
             position: relative;
             display: inline-flex;
             align-items: center;
@@ -1946,8 +1959,9 @@
         }
 
         .btn-primary-large:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(30, 58, 138, 0.4);
+            background: var(--gray-lighter);
+            border-color: var(--gray);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
 
         .btn-primary-large:active {
@@ -2667,6 +2681,9 @@
             </div>
             
             <div class="actions-grid">
+                <button onclick="regenerarFacturacionMesActual(event)" class="btn-secondary" style="font-weight: 600;" title="Regenera la facturación del mes visualizado copiando datos del mes anterior">
+                    ♻️ Regenerar facturación
+                </button>
                 <button onclick="exportData()" class="btn-primary">Exportar a Excel</button>
                 <button onclick="viewHistory()" class="btn-secondary">Ver histórico mensual</button>
                 <button onclick="viewMonthlyChanges()" class="btn-secondary">Ver cambios del mes</button>
@@ -3761,6 +3778,564 @@
                 const municipios = [...new Set(panelsData.map(p => p.municipio))].filter(m => m).sort();
                 console.log('Municipios únicos extraídos:', municipios);
                 populateFilters();
+            }
+        };
+
+        // Función de debugging para verificar facturación de un panel específico
+        window.debugPanel = function(codigo) {
+            console.log('🔍 DEBUG PANEL:', codigo);
+            
+            const panel = panelsData.find(p => p.codigo === codigo || String(p.codigo) === String(codigo));
+            
+            if (!panel) {
+                console.error('❌ Panel no encontrado:', codigo);
+                console.log('Paneles disponibles:', panelsData.map(p => p.codigo));
+                return;
+            }
+            
+            console.log('📋 Datos del panel:');
+            console.log('  - Municipio:', panel.municipio);
+            console.log('  - Código:', panel.codigo);
+            console.log('  - Tarifa:', panel.tarifa);
+            console.log('  - Estado:', panel.estado);
+            console.log('  - Fecha Instalación:', panel.fechaInstalacion);
+            console.log('  - Fecha Desmontaje:', panel.fechaDesmontaje);
+            console.log('  - ID Firestore:', panel.id);
+            
+            const mes = parseInt(document.getElementById('currentMonth').value);
+            const year = parseInt(document.getElementById('currentYear').value);
+            console.log('📅 Calculando para:', mes + '/' + year);
+            
+            const calculo = calcularFacturacion(panel, mes, year);
+            console.log('💰 Resultado del cálculo:');
+            console.log('  - Días:', calculo.dias);
+            console.log('  - Importe:', calculo.importe, '€');
+            console.log('  - Tipo:', calculo.tipo);
+            console.log('  - Tarifa diaria:', calculo.tarifaDiaria);
+            console.log('  - Desde:', calculo.desde);
+            console.log('  - Hasta:', calculo.hasta);
+            
+            // Explicar por qué tiene 0 días
+            if (calculo.dias === 0) {
+                console.warn('⚠️ RAZÓN DE 0 FACTURACIÓN:');
+                if (calculo.tipo === 'inactivo') {
+                    if (panel.fechaInstalacion) {
+                        const fi = new Date(panel.fechaInstalacion);
+                        if (fi.getFullYear() > year || (fi.getFullYear() === year && fi.getMonth() + 1 > mes)) {
+                            console.warn('  ➡️ Panel AÚN NO INSTALADO en este mes');
+                            console.warn('  ➡️ Se instalará el:', fi.toLocaleDateString('es-ES'));
+                        }
+                    }
+                    if (panel.fechaDesmontaje) {
+                        const fd = new Date(panel.fechaDesmontaje);
+                        if (fd.getFullYear() < year || (fd.getFullYear() === year && fd.getMonth() + 1 < mes)) {
+                            console.warn('  ➡️ Panel YA DESMONTADO antes de este mes');
+                            console.warn('  ➡️ Se desmontó el:', fd.toLocaleDateString('es-ES'));
+                        }
+                    }
+                }
+            }
+            
+            return { panel, calculo };
+        };
+
+        // Función para verificar estructura de eventos
+        window.verificarEventosPanel = async function(codigo) {
+            try {
+                console.log('🔍 VERIFICANDO ESTRUCTURA DE EVENTOS');
+                console.log('═══════════════════════════════════════');
+                
+                const panel = panelsData.find(p => p.codigo === codigo || String(p.codigo) === String(codigo));
+                if (!panel || !panel.id) {
+                    console.error('❌ Panel no encontrado');
+                    return;
+                }
+                
+                const panelId = panel.id;
+                
+                // 1. Verificar colección 'eventos'
+                console.log('1️⃣ Verificando paneles/' + panelId + '/eventos');
+                console.log('─────────────────────────────────────');
+                const eventosSnap = await firebaseDB.collection('paneles').doc(panelId).collection('eventos').get();
+                
+                if (eventosSnap.empty) {
+                    console.log('❌ No hay documentos en /eventos');
+                } else {
+                    console.log(`✅ ${eventosSnap.size} documento(s) encontrado(s)`);
+                    eventosSnap.forEach(doc => {
+                        const data = doc.data();
+                        console.log(`\n📋 Evento: ${doc.id}`);
+                        console.log('   Campos:', Object.keys(data));
+                        console.log('   Datos:', data);
+                    });
+                }
+                
+                console.log('\n');
+                
+                // 2. Verificar colección 'changes'
+                console.log('2️⃣ Verificando paneles/' + panelId + '/changes');
+                console.log('─────────────────────────────────────');
+                const changesSnap = await firebaseDB.collection('paneles').doc(panelId).collection('changes').get();
+                
+                if (changesSnap.empty) {
+                    console.log('❌ No hay documentos en /changes');
+                } else {
+                    console.log(`✅ ${changesSnap.size} documento(s) encontrado(s)`);
+                    changesSnap.forEach(doc => {
+                        const data = doc.data();
+                        console.log(`\n📋 Change: ${doc.id}`);
+                        console.log('   Campos:', Object.keys(data));
+                        console.log('   Datos:', data);
+                    });
+                }
+                
+                console.log('\n═══════════════════════════════════════');
+                
+            } catch (error) {
+                console.error('❌ Error:', error);
+            }
+        };
+
+        // Función de diagnóstico completa de Firestore para un panel
+        window.diagnosticarFirestore = async function(codigo, mes = '11', year = '2025') {
+            try {
+                console.log('🔍 DIAGNÓSTICO COMPLETO DE FIRESTORE');
+                console.log('═══════════════════════════════════════');
+                console.log('Panel:', codigo);
+                console.log('Mes:', mes, 'Año:', year);
+                console.log('═══════════════════════════════════════\n');
+                
+                const panel = panelsData.find(p => p.codigo === codigo || String(p.codigo) === String(codigo));
+                
+                if (!panel) {
+                    console.error('❌ Panel no encontrado en memoria local');
+                    return;
+                }
+                
+                const panelId = panel.id;
+                const monthKey = `${year}-${mes.padStart(2, '0')}`;
+                
+                // 1. Verificar documento principal del panel
+                console.log('1️⃣ COLECCIÓN: paneles/' + panelId);
+                console.log('─────────────────────────────────────');
+                try {
+                    const panelDoc = await firebaseDB.collection('paneles').doc(panelId).get();
+                    if (panelDoc.exists) {
+                        const data = panelDoc.data();
+                        console.log('✅ Documento encontrado:');
+                        console.log('   - municipio:', data.municipio);
+                        console.log('   - codigo:', data.codigo);
+                        console.log('   - tarifa:', data.tarifa, typeof data.tarifa);
+                        console.log('   - estado:', data.estado);
+                        console.log('   - fechaInstalacion:', data.fechaInstalacion);
+                        console.log('   - fechaDesmontaje:', data.fechaDesmontaje);
+                        console.log('   - operador:', data.operador);
+                    } else {
+                        console.error('❌ Documento NO existe en paneles/');
+                    }
+                } catch (err) {
+                    console.error('❌ Error leyendo paneles/:', err.message);
+                }
+                
+                console.log('\n');
+                
+                // 2. Verificar eventos del panel
+                console.log('2️⃣ COLECCIÓN: paneles/' + panelId + '/eventos');
+                console.log('─────────────────────────────────────');
+                try {
+                    const eventosSnapshot = await firebaseDB.collection('paneles').doc(panelId).collection('eventos').get();
+                    if (eventosSnapshot.empty) {
+                        console.log('ℹ️  No hay eventos registrados');
+                    } else {
+                        console.log(`✅ ${eventosSnapshot.size} evento(s) encontrado(s):`);
+                        eventosSnapshot.forEach(doc => {
+                            const data = doc.data();
+                            console.log(`   📋 ID: ${doc.id}`);
+                            console.log(`      - tipo: ${data.tipo}`);
+                            console.log(`      - fecha: ${data.fecha}`);
+                            console.log(`      - monthKey: ${data.monthKey}`);
+                            console.log(`      - municipio: ${data.municipio}`);
+                            console.log(`      - tarifa: ${data.tarifa}`);
+                            console.log('');
+                        });
+                    }
+                } catch (err) {
+                    console.error('❌ Error leyendo eventos/:', err.message);
+                }
+                
+                console.log('\n');
+                
+                // 3. Verificar billing del mes específico
+                const billingDocId = `${codigo}_${monthKey}`;
+                console.log('3️⃣ COLECCIÓN: panel_month_billing/' + billingDocId);
+                console.log('─────────────────────────────────────');
+                try {
+                    const billingDoc = await firebaseDB.collection('panel_month_billing').doc(billingDocId).get();
+                    if (billingDoc.exists) {
+                        const data = billingDoc.data();
+                        console.log('✅ Documento encontrado:');
+                        console.log('   - panelId:', data.panelId);
+                        console.log('   - monthKey:', data.monthKey);
+                        console.log('   - dias:', data.dias);
+                        console.log('   - importe:', data.importe);
+                        console.log('   - tarifa:', data.tarifa);
+                        console.log('   - tipo:', data.tipo);
+                        console.log('   - eventos:', data.eventos ? data.eventos.length : 0);
+                    } else {
+                        console.log('ℹ️  Documento NO existe (se creará al calcular facturación)');
+                    }
+                } catch (err) {
+                    console.error('❌ Error leyendo panel_month_billing/:', err.message);
+                }
+                
+                console.log('\n');
+                
+                // 4. Verificar resumen de facturación del mes
+                const summaryDocId = year + mes.padStart(2, '0');
+                console.log('4️⃣ COLECCIÓN: billing_summary/' + summaryDocId);
+                console.log('─────────────────────────────────────');
+                try {
+                    const summaryDoc = await firebaseDB.collection('billing_summary').doc(summaryDocId).get();
+                    if (summaryDoc.exists) {
+                        const data = summaryDoc.data();
+                        console.log('✅ Resumen del mes encontrado:');
+                        console.log('   - totalPaneles:', data.totalPaneles);
+                        console.log('   - totalImporte:', data.totalImporte);
+                        console.log('   - panelesActivos:', data.panelesActivos);
+                        console.log('   - panelesParciales:', data.panelesParciales);
+                        console.log('   - panelesInactivos:', data.panelesInactivos);
+                    } else {
+                        console.log('ℹ️  Resumen del mes NO existe');
+                    }
+                } catch (err) {
+                    console.error('❌ Error leyendo billing_summary/:', err.message);
+                }
+                
+                console.log('\n═══════════════════════════════════════');
+                console.log('🏁 DIAGNÓSTICO COMPLETO');
+                
+            } catch (error) {
+                console.error('❌ Error en diagnóstico:', error);
+            }
+        };
+
+        // Función para regenerar TODA la facturación desde cero (solo paneles base)
+        window.regenerarFacturacionCompleta = async function(mes = '11', year = '2025', copiarDelMesAnterior = false) {
+            try {
+                console.log('🔄 REGENERANDO FACTURACIÓN COMPLETA DESDE CERO');
+                console.log('═══════════════════════════════════════════════');
+                
+                const monthKey = `${year}-${mes.padStart(2, '0')}`;
+                const summaryDocId = year + mes.padStart(2, '0');
+                
+                // Si se solicita copiar del mes anterior
+                if (copiarDelMesAnterior) {
+                    console.log('📋 Modo: COPIAR DEL MES ANTERIOR (sin recalcular fechas)');
+                    
+                    // Calcular mes anterior
+                    const mesNum = parseInt(mes);
+                    const yearNum = parseInt(year);
+                    const prevM = mesNum === 1 ? 12 : mesNum - 1;
+                    const prevY = mesNum === 1 ? yearNum - 1 : yearNum;
+                    const monthKeyAnterior = `${prevY}-${String(prevM).padStart(2, '0')}`;
+                    
+                    console.log(`📦 Copiando datos de ${monthKeyAnterior}...`);
+                    
+                    // Leer datos del mes anterior
+                    const snapshotAnterior = await firebaseDB.collection('panel_month_billing')
+                        .where('monthKey', '==', monthKeyAnterior)
+                        .get();
+                    
+                    if (snapshotAnterior.empty) {
+                        console.error('❌ No hay datos en el mes anterior');
+                        alert('❌ No se encontraron datos en el mes anterior');
+                        return;
+                    }
+                    
+                    console.log(`✅ ${snapshotAnterior.size} paneles encontrados en ${monthKeyAnterior}`);
+                    
+                    // Copiar a nuevo mes
+                    const batch = firebaseDB.batch();
+                    let batchCount = 0;
+                    const BATCH_SIZE = 500;
+                    let totalImporte = 0;
+                    let panelesActivos = 0;
+                    let panelesParciales = 0;
+                    let panelesInactivos = 0;
+                    
+                    snapshotAnterior.forEach(doc => {
+                        const data = doc.data();
+                        const nuevoDato = {
+                            ...data,
+                            monthKey: monthKey,
+                            eventos: [],
+                            acciones: {},
+                            copiadoDe: monthKeyAnterior
+                        };
+                        
+                        const docId = `${data.codigo}_${monthKey}`;
+                        const docRef = firebaseDB.collection('panel_month_billing').doc(docId);
+                        batch.set(docRef, nuevoDato);
+                        batchCount++;
+                        
+                        totalImporte += data.totalImporte || 0;
+                        const dias = data.totalDiasFacturables || 0;
+                        if (dias === 0) panelesInactivos++;
+                        else if (dias === 30) panelesActivos++;
+                        else panelesParciales++;
+                    });
+                    
+                    await batch.commit();
+                    
+                    totalImporte = Math.round(totalImporte * 100) / 100;
+                    
+                    // Guardar resumen
+                    await firebaseDB.collection('billing_summary').doc(summaryDocId).set({
+                        monthKey: monthKey,
+                        totalPaneles: snapshotAnterior.size,
+                        totalImporte: totalImporte,
+                        panelesActivos: panelesActivos,
+                        panelesParciales: panelesParciales,
+                        panelesInactivos: panelesInactivos,
+                        copiadoDe: monthKeyAnterior,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    console.log('📊 RESUMEN COPIADO:');
+                    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    console.log(`Total paneles: ${snapshotAnterior.size}`);
+                    console.log(`  ├─ Activos (30 días): ${panelesActivos}`);
+                    console.log(`  ├─ Parciales (< 30 días): ${panelesParciales}`);
+                    console.log(`  └─ Inactivos (0 días): ${panelesInactivos}`);
+                    console.log(`Total facturación: ${totalImporte.toFixed(2)} €`);
+                    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+                    
+                    alert(`✅ Facturación copiada de ${monthKeyAnterior} a ${monthKey}\n\n` +
+                          `Total paneles: ${snapshotAnterior.size}\n` +
+                          `Total: ${totalImporte.toFixed(2)} €\n\n` +
+                          `Recarga la página para ver los cambios`);
+                    
+                    return { totalPaneles: snapshotAnterior.size, totalImporte, panelesActivos, panelesParciales, panelesInactivos };
+                }
+                
+                // Modo normal: calcular desde fechas
+                // 1. Cargar TODOS los paneles desde Firestore
+                console.log('📦 Cargando todos los paneles desde Firestore...');
+                const snapshot = await firebaseDB.collection('paneles').orderBy('municipio').get();
+                
+                let totalPaneles = 0;
+                let totalImporte = 0;
+                let panelesActivos = 0;
+                let panelesParciales = 0;
+                let panelesInactivos = 0;
+                
+                console.log(`✅ ${snapshot.size} paneles cargados`);
+                console.log('💰 Calculando facturación para cada panel...\n');
+                
+                const mesNum = parseInt(mes);
+                const yearNum = parseInt(year);
+                
+                // Preparar batch para guardar panel_month_billing
+                const batch = firebaseDB.batch();
+                let batchCount = 0;
+                const BATCH_SIZE = 500;
+                
+                const panelBillings = [];
+                
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const panel = {
+                        id: doc.id,
+                        municipio: data.municipio,
+                        codigo: data.codigo,
+                        tarifa: data.tarifa || 37.70,
+                        fechaInstalacion: data.fechaInstalacion,
+                        fechaDesmontaje: data.fechaDesmontaje,
+                        estado: data.estado || (data.fechaDesmontaje ? 'desmontado' : 'activo')
+                    };
+                    
+                    // Calcular facturación
+                    const calculo = calcularFacturacion(panel, mesNum, yearNum);
+                    
+                    totalPaneles++;
+                    
+                    if (calculo.dias === 0) {
+                        panelesInactivos++;
+                    } else if (calculo.dias === 30) {
+                        panelesActivos++;
+                        totalImporte += calculo.importe;
+                    } else {
+                        panelesParciales++;
+                        totalImporte += calculo.importe;
+                    }
+                    
+                    // Crear documento panel_month_billing
+                    panelBillings.push({
+                        panelId: String(panel.codigo),
+                        codigo: panel.codigo,
+                        municipio: panel.municipio,
+                        monthKey: monthKey,
+                        totalDiasFacturables: calculo.dias,
+                        totalImporte: calculo.importe,
+                        tarifa: panel.tarifa,
+                        tipo: calculo.tipo,
+                        eventos: [],
+                        acciones: {}
+                    });
+                });
+                
+                // Guardar todos los panel_month_billing en batches
+                console.log(`💾 Guardando ${panelBillings.length} documentos en panel_month_billing...`);
+                for (let i = 0; i < panelBillings.length; i++) {
+                    const billingData = panelBillings[i];
+                    const docId = `${billingData.codigo}_${monthKey}`;
+                    const docRef = firebaseDB.collection('panel_month_billing').doc(docId);
+                    batch.set(docRef, billingData);
+                    batchCount++;
+                    
+                    // Commit cada 500 operaciones (límite de Firestore)
+                    if (batchCount >= BATCH_SIZE) {
+                        await batch.commit();
+                        console.log(`  ✅ Guardados ${i + 1}/${panelBillings.length}...`);
+                        batchCount = 0;
+                    }
+                }
+                
+                // Commit final
+                if (batchCount > 0) {
+                    await batch.commit();
+                }
+                console.log(`✅ ${panelBillings.length} documentos guardados en panel_month_billing`);
+                
+                // Redondear
+                totalImporte = Math.round(totalImporte * 100) / 100;
+                
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.log('📊 RESUMEN CALCULADO:');
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.log(`Total paneles: ${totalPaneles}`);
+                console.log(`  ├─ Activos (30 días): ${panelesActivos}`);
+                console.log(`  ├─ Parciales (< 30 días): ${panelesParciales}`);
+                console.log(`  └─ Inactivos (0 días): ${panelesInactivos}`);
+                console.log(`Total facturación: ${totalImporte.toFixed(2)} €`);
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+                
+                // 2. Guardar en billing_summary
+                console.log('💾 Guardando en billing_summary/' + summaryDocId + '...');
+                await firebaseDB.collection('billing_summary').doc(summaryDocId).set({
+                    monthKey: monthKey,
+                    totalPaneles: totalPaneles,
+                    totalImporte: totalImporte,
+                    panelesActivos: panelesActivos,
+                    panelesParciales: panelesParciales,
+                    panelesInactivos: panelesInactivos,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    regeneratedBy: firebaseAuth.currentUser.email,
+                    regeneratedAt: new Date().toISOString()
+                });
+                
+                console.log('✅ Resumen guardado correctamente');
+                console.log('═══════════════════════════════════════════════');
+                
+                alert(`✅ Facturación regenerada para ${monthKey}\n\n` +
+                      `Total paneles: ${totalPaneles}\n` +
+                      `Activos: ${panelesActivos}\n` +
+                      `Parciales: ${panelesParciales}\n` +
+                      `Inactivos: ${panelesInactivos}\n` +
+                      `Total: ${totalImporte.toFixed(2)} €\n\n` +
+                      `Recarga la página para ver los cambios`);
+                
+                return { totalPaneles, totalImporte, panelesActivos, panelesParciales, panelesInactivos };
+                
+            } catch (error) {
+                console.error('❌ Error regenerando facturación:', error);
+                alert(`❌ Error: ${error.message}`);
+            }
+        };
+
+        // Función para limpiar datos obsoletos de un panel
+        window.limpiarDatosPanel = async function(codigo, mes = '11', year = '2025') {
+            try {
+                console.log('🧹 LIMPIANDO DATOS OBSOLETOS DEL PANEL:', codigo);
+                
+                const panel = panelsData.find(p => p.codigo === codigo || String(p.codigo) === String(codigo));
+                if (!panel || !panel.id) {
+                    console.error('❌ Panel no encontrado');
+                    return;
+                }
+                
+                const monthKey = `${year}-${mes.padStart(2, '0')}`;
+                const billingDocId = `${codigo}_${monthKey}`;
+                
+                // 1. Eliminar documento de panel_month_billing
+                console.log('🗑️  Eliminando panel_month_billing/' + billingDocId);
+                try {
+                    await firebaseDB.collection('panel_month_billing').doc(billingDocId).delete();
+                    console.log('✅ Eliminado');
+                } catch (err) {
+                    console.log('ℹ️  No existía el documento');
+                }
+                
+                // 2. Eliminar todos los eventos del panel
+                console.log('🗑️  Eliminando eventos del panel...');
+                const eventosSnapshot = await firebaseDB.collection('paneles').doc(panel.id).collection('eventos').get();
+                const batch = firebaseDB.batch();
+                eventosSnapshot.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+                console.log(`✅ ${eventosSnapshot.size} evento(s) eliminado(s)`);
+                
+                console.log('✅ Limpieza completada');
+                alert('✅ Datos obsoletos eliminados\n\nAhora ejecuta:\nregenerarFacturacionCompleta()');
+                
+            } catch (error) {
+                console.error('❌ Error limpiando datos:', error);
+                alert(`❌ Error: ${error.message}`);
+            }
+        };
+
+        // Función para actualizar/restaurar la tarifa de un panel en Firestore
+        window.actualizarTarifaPanel = async function(codigo, nuevaTarifa = 37.70) {
+            try {
+                console.log('🔄 Actualizando tarifa del panel:', codigo);
+                
+                const panel = panelsData.find(p => p.codigo === codigo || String(p.codigo) === String(codigo));
+                
+                if (!panel) {
+                    console.error('❌ Panel no encontrado:', codigo);
+                    return;
+                }
+                
+                if (!panel.id) {
+                    console.error('❌ Panel sin ID de Firestore:', codigo);
+                    return;
+                }
+                
+                // Actualizar en Firestore
+                await firebaseDB.collection('paneles').doc(panel.id).update({
+                    tarifa: nuevaTarifa,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                console.log('✅ Tarifa actualizada en Firestore');
+                
+                // Actualizar en memoria local
+                panel.tarifa = nuevaTarifa;
+                
+                // Recargar tabla y estadísticas
+                await updateTable();
+                await actualizarEstadisticas();
+                
+                console.log('✅ Panel actualizado:', codigo, '- Nueva tarifa:', nuevaTarifa);
+                alert(`✅ Tarifa actualizada\n\nPanel ${codigo}: ${nuevaTarifa} €/mes`);
+                
+                return true;
+            } catch (error) {
+                console.error('❌ Error actualizando tarifa:', error);
+                alert(`❌ Error al actualizar:\n\n${error.message}`);
+                return false;
             }
         };
         
@@ -4862,6 +5437,72 @@
                 panelsData.splice(index, 1);
                 saveData();
                 updateTable();
+            }
+        }
+
+        // Regenerar facturación del mes actual visualizado
+        async function regenerarFacturacionMesActual(evt) {
+            try {
+                const month = document.getElementById('currentMonth').value;
+                const year = document.getElementById('currentYear').value;
+                const monthName = getMonthName(month);
+                
+                const confirmacion = confirm(
+                    `♻️ REGENERAR FACTURACIÓN\n\n` +
+                    `Mes: ${monthName} ${year}\n\n` +
+                    `Esta acción copiará los datos del mes anterior sin recalcular fechas.\n\n` +
+                    `Esto es útil cuando:\n` +
+                    `• No hay eventos nuevos en este mes\n` +
+                    `• Quieres mantener los mismos valores del mes anterior\n` +
+                    `• Has eliminado eventos incorrectos\n\n` +
+                    `¿Continuar?`
+                );
+                
+                if (!confirmacion) return;
+                
+                // Mostrar indicador de carga
+                const btnElement = evt ? evt.target : null;
+                const originalText = btnElement ? btnElement.textContent : '';
+                if (btnElement) {
+                    btnElement.textContent = '⏳ Regenerando...';
+                    btnElement.disabled = true;
+                }
+                
+                console.log(`🔄 Regenerando facturación para ${month}/${year}...`);
+                
+                // Ejecutar regeneración con modo "copiar del mes anterior"
+                const resultado = await regenerarFacturacionCompleta(month, year, true);
+                
+                // Recargar datos
+                await updateTable();
+                await actualizarEstadisticas();
+                
+                // Restaurar botón
+                if (btnElement) {
+                    btnElement.textContent = originalText;
+                    btnElement.disabled = false;
+                }
+                
+                alert(
+                    `✅ FACTURACIÓN REGENERADA\n\n` +
+                    `Mes: ${monthName} ${year}\n` +
+                    `Paneles: ${resultado.totalPaneles}\n` +
+                    `Total: ${resultado.totalImporte.toFixed(2)} €\n\n` +
+                    `La página se recargará para mostrar los cambios.`
+                );
+                
+                // Recargar página
+                location.reload();
+                
+            } catch (error) {
+                console.error('❌ Error regenerando facturación:', error);
+                alert(`❌ Error al regenerar:\n\n${error.message}`);
+                
+                // Restaurar botón en caso de error
+                if (btnElement) {
+                    btnElement.textContent = '♻️ Regenerar facturación';
+                    btnElement.disabled = false;
+                }
             }
         }
 
@@ -7467,11 +8108,11 @@
                 // ========================================
                 console.log(`📦 PASO 2: Recopilando eventos desde ${mesBase} hasta ${monthKey}...`);
                 
-                // Obtener todos los meses entre base y consultado
+                // Obtener todos los meses entre base y consultado (EXCLUYENDO el mes consultado)
                 const mesesIntermidios = [];
                 let mesTemporal = mesBase;
                 
-                while (mesTemporal <= monthKey) {
+                while (mesTemporal < monthKey) {  // ← CAMBIO: < en vez de <=
                     if (mesTemporal !== mesBase) {
                         mesesIntermidios.push(mesTemporal);
                     }
@@ -7482,7 +8123,7 @@
                     mesTemporal = `${yearSig}-${String(mesSig).padStart(2, '0')}`;
                 }
                 
-                console.log(`   Meses a procesar: ${mesesIntermidios.join(', ')}\n`);
+                console.log(`   Meses a procesar (hasta mes anterior): ${mesesIntermidios.join(', ')}\n`);
                 
                 // Cargar TODOS los eventos
                 const todosLosEventos = [];
@@ -7510,51 +8151,96 @@
                 console.log(`✅ Total eventos recopilados: ${todosLosEventos.length}\n`);
                 
                 // ========================================
-                // PASO 4: APLICAR EVENTOS ACUMULADOS
+                // PASO 4: APLICAR EVENTOS ACUMULADOS (hasta el mes anterior)
                 // ========================================
-                console.log(`📦 PASO 3: Aplicando eventos sobre la base...`);
+                console.log(`📦 PASO 3: Aplicando eventos acumulados (meses intermedios)...`);
                 
                 const estadoFinal = JSON.parse(JSON.stringify(factBase));
-                const desglose = [];
                 let eventosAplicados = 0;
                 
                 todosLosEventos.forEach(evento => {
-                    const base = factBase[evento.panelId] || { dias: 0, importe: 0, municipio: '' };
-                    
                     // Actualizar estado final
                     estadoFinal[evento.panelId] = {
                         dias: evento.diasNuevos,
                         importe: evento.importeNuevo,
-                        municipio: evento.municipio || base.municipio
+                        municipio: evento.municipio || estadoFinal[evento.panelId]?.municipio || ''
                     };
                     
                     const numEventos = Object.values(evento.acciones).reduce((a, b) => a + b, 0);
                     eventosAplicados += numEventos;
+                });
+                
+                console.log(`   Eventos aplicados (meses intermedios): ${eventosAplicados}\n`);
+                
+                // ========================================
+                // PASO 5: APLICAR EVENTOS DEL MES CONSULTADO
+                // ========================================
+                console.log(`📦 PASO 4: Procesando eventos DEL mes consultado (${monthKey})...`);
+                
+                const desglose = [];
+                const eventosDelMes = await firebaseDB.collection('panel_month_billing')
+                    .where('monthKey', '==', monthKey)
+                    .get();
+                
+                console.log(`   Eventos encontrados en ${monthKey}: ${eventosDelMes.size}`);
+                
+                eventosDelMes.forEach(doc => {
+                    const data = doc.data();
+                    const panelId = data.panelId;
+                    const estadoAnterior = estadoFinal[panelId] || { dias: 0, importe: 0, municipio: '' };
                     
-                    // Solo agregar al desglose si es del mes consultado
-                    if (evento.mes === monthKey) {
-                        const diferenciaDias = evento.diasNuevos - base.dias;
-                        const diferenciaImporte = evento.importeNuevo - base.importe;
-                        
-                        if (Math.abs(diferenciaDias) > 0 || Math.abs(diferenciaImporte) > 0.01) {
-                            desglose.push({
-                                panelId: evento.panelId,
-                                municipio: evento.municipio,
-                                monthKey: monthKey,
-                                eventos: numEventos,
-                                diasBase: base.dias,
-                                diasNuevos: evento.diasNuevos,
-                                diferenciaDias: diferenciaDias,
-                                importeBase: base.importe,
-                                importeNuevo: evento.importeNuevo,
-                                diferenciaImporte: diferenciaImporte
-                            });
-                        }
+                    const diasNuevos = data.totalDiasFacturables || 0;
+                    const importeNuevo = data.totalImporte || 0;
+                    
+                    // Actualizar estado final con datos del mes actual
+                    estadoFinal[panelId] = {
+                        dias: diasNuevos,
+                        importe: importeNuevo,
+                        municipio: data.municipio || estadoAnterior.municipio
+                    };
+                    
+                    // Calcular diferencias para el desglose
+                    const diferenciaDias = diasNuevos - estadoAnterior.dias;
+                    const diferenciaImporte = importeNuevo - estadoAnterior.importe;
+                    
+                    // ============================================================
+                    // CORRECCIÓN: Solo mostrar paneles con EVENTOS REALES
+                    // ============================================================
+                    
+                    // 1. Verificar que tiene acciones documentadas
+                    const acciones = data.acciones || {};
+                    const tieneAccionesReales = Object.keys(acciones).length > 0 && 
+                                                !acciones.REGENERACION_CSV &&  // Excluir regeneraciones automáticas
+                                                !data.copiadoDe;                 // Excluir copias automáticas del mes anterior
+                    
+                    // 2. Contar eventos reales
+                    const numEventos = Object.values(acciones).reduce((a, b) => a + b, 0);
+                    
+                    // 3. Solo agregar al desglose si:
+                    //    - Tiene acciones REALES documentadas
+                    //    - Y además hay diferencia en días o importe
+                    if (tieneAccionesReales && (Math.abs(diferenciaDias) > 0 || Math.abs(diferenciaImporte) > 0.01)) {
+                        desglose.push({
+                            panelId: panelId,
+                            municipio: data.municipio || estadoAnterior.municipio,
+                            monthKey: monthKey,
+                            eventos: numEventos,
+                            diasBase: estadoAnterior.dias,
+                            diasNuevos: diasNuevos,
+                            diferenciaDias: diferenciaDias,
+                            importeBase: estadoAnterior.importe,
+                            importeNuevo: importeNuevo,
+                            diferenciaImporte: diferenciaImporte
+                        });
+                    }
+                    
+                    // Log para debugging: paneles excluidos del desglose
+                    if (!tieneAccionesReales && (Math.abs(diferenciaDias) > 0 || Math.abs(diferenciaImporte) > 0.01)) {
+                        console.log(`   ⚪ Panel ${panelId} excluido del desglose (sin acciones reales, solo herencia)`);
                     }
                 });
                 
-                console.log(`   Eventos acumulados aplicados: ${eventosAplicados}`);
-                console.log(`   Desglose del mes consultado: ${desglose.length} cambios\n`);
+                console.log(`   Cambios detectados en el mes: ${desglose.length}\n`);
                 
                 // ========================================
                 // PASO 5: CALCULAR TOTALES FINALES
