@@ -2815,12 +2815,6 @@
                         <div id="desmontajePanelPicker"></div>
                     </div>
                     <div class="form-group">
-                        <label>Panel Seleccionado</label>
-                        <div id="desmontajePanelInfo" style="padding: 12px; background: #F9FAFB; border-radius: 8px; font-size: 14px; color: #64748B;">
-                            Ningún panel seleccionado
-                        </div>
-                    </div>
-                    <div class="form-group">
                         <label for="desmontajeFecha">Fecha de Desmontaje *</label>
                         <input type="date" id="desmontajeFecha" required>
                     </div>
@@ -5374,22 +5368,23 @@
             try {
                 const month = document.getElementById('currentMonth').value;
                 const year = document.getElementById('currentYear').value;
+                const monthKey = `${year}-${String(month).padStart(2, '0')}`;
                 const monthName = getMonthName(month);
                 
                 const confirmacion = confirm(
-                    `♻️ REGENERAR FACTURACIÓN\n\n` +
+                    `♻️ REGENERAR FACTURACIÓN CON EVENTOS\n\n` +
                     `Mes: ${monthName} ${year}\n\n` +
-                    `Esta acción copiará los datos del mes anterior sin recalcular fechas.\n\n` +
-                    `Esto es útil cuando:\n` +
-                    `• No hay eventos nuevos en este mes\n` +
-                    `• Quieres mantener los mismos valores del mes anterior\n` +
-                    `• Has eliminado eventos incorrectos\n\n` +
+                    `Esta acción:\n` +
+                    `✓ Leerá TODOS los eventos del mes desde Firestore\n` +
+                    `✓ Recalculará la facturación desde cero\n` +
+                    `✓ Aplicará correctamente los cambios (altas, bajas, etc.)\n` +
+                    `✓ Ignorará datos del mes anterior\n\n` +
+                    `Es la forma CORRECTA de recalcular cuando hay eventos.\n\n` +
                     `¿Continuar?`
                 );
                 
                 if (!confirmacion) return;
                 
-                // Mostrar indicador de carga
                 const btnElement = evt ? evt.target : null;
                 const originalText = btnElement ? btnElement.textContent : '';
                 if (btnElement) {
@@ -5397,37 +5392,38 @@
                     btnElement.disabled = true;
                 }
                 
-                console.log(`🔄 Regenerando facturación para ${month}/${year}...`);
+                console.log(`🔄 Regenerando facturación para ${monthKey}...`);
                 
-                // Ejecutar regeneración con modo "copiar del mes anterior"
-                const resultado = await regenerarFacturacionCompleta(month, year, true);
-                
-                // Recargar datos
-                await updateTable();
-                await actualizarEstadisticas();
-                
-                // Restaurar botón
-                if (btnElement) {
-                    btnElement.textContent = originalText;
-                    btnElement.disabled = false;
+                try {
+                    const resultado = await BillingService.rebuildMonthlyBilling(monthKey);
+                    
+                    await updateTable();
+                    await actualizarEstadisticas();
+                    
+                    if (btnElement) {
+                        btnElement.textContent = originalText;
+                        btnElement.disabled = false;
+                    }
+                    
+                    alert(
+                        `✅ FACTURACIÓN REGENERADA\n\n` +
+                        `Mes: ${monthName} ${year}\n` +
+                        `Paneles: ${resultado.paneles || 0}\n` +
+                        `Total: ${(resultado.totalImporte || 0).toFixed(2)} €\n` +
+                        `Eventos: ${resultado.totalAcciones || 0}`
+                    );
+                    
+                    location.reload();
+                    
+                } catch (error) {
+                    throw error;
                 }
                 
-                alert(
-                    `✅ FACTURACIÓN REGENERADA\n\n` +
-                    `Mes: ${monthName} ${year}\n` +
-                    `Paneles: ${resultado.totalPaneles}\n` +
-                    `Total: ${resultado.totalImporte.toFixed(2)} €\n\n` +
-                    `La página se recargará para mostrar los cambios.`
-                );
-                
-                // Recargar página
-                location.reload();
-                
             } catch (error) {
-                console.error('❌ Error regenerando facturación:', error);
-                alert(`❌ Error al regenerar:\n\n${error.message}`);
+                console.error('❌ Error:', error);
+                alert(`❌ Error:\n\n${error.message}`);
                 
-                // Restaurar botón en caso de error
+                const btnElement = evt ? evt.target : null;
                 if (btnElement) {
                     btnElement.textContent = '♻️ Regenerar facturación';
                     btnElement.disabled = false;
@@ -6308,24 +6304,6 @@
             modal.classList.remove('hidden');
             setTimeout(() => modal.classList.add('show'), 10);
             panelSeleccionadoDesmontaje = null;
-        }
-
-        function seleccionarPanelDesmontaje(codigo) {
-            panelSeleccionadoDesmontaje = panelsData.find(p => p.codigo === codigo);
-            
-            if (panelSeleccionadoDesmontaje) {
-                document.getElementById('desmontajePanelInfo').innerHTML = `
-                    <strong>${panelSeleccionadoDesmontaje.codigo}</strong><br>
-                    <span style="color: #64748B; font-size: 13px;">
-                        ${panelSeleccionadoDesmontaje.municipio}  Tarifa: ${(panelSeleccionadoDesmontaje.tarifa || 37.70).toFixed(2)} €/mes
-                    </span>
-                `;
-                
-                document.getElementById('desmontagResults').classList.remove('show');
-                document.getElementById('desmontajeBuscar').value = panelSeleccionadoDesmontaje.codigo;
-                
-                actualizarVistaPreviewDesmontaje();
-            }
         }
 
         async function actualizarVistaPreviewDesmontaje() {

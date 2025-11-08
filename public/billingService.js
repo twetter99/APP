@@ -946,6 +946,13 @@ async function applyChange(panelId, payload) {
         });
         
         console.log('✅ Cambio aplicado exitosamente:', result);
+        
+        // CRÍTICO: Reconstruir facturación del mes para calcular correctamente desde los eventos
+        const monthKey = formatDateKey(payload.effectiveDate);
+        console.log(`🔨 Reconstruyendo facturación del mes ${monthKey} después del cambio...`);
+        await rebuildMonthlyBilling(monthKey);
+        console.log(`✅ Facturación reconstruida correctamente para ${monthKey}`);
+        
         return result;
         
     } catch (error) {
@@ -963,77 +970,105 @@ async function rebuildMonthlyBilling(monthKey) {
     try {
         console.log(`🔨 Reconstruyendo facturación para mes ${monthKey}`);
         
-        // Obtener todos los cambios del mes
-        const changesQuery = await db.collectionGroup('changes')
-            .where('monthKey', '==', monthKey)
-            .get();
+        // Verificar autenticación
+        const currentUser = firebase.auth().currentUser;
+        if (!currentUser) {
+            throw new Error('Usuario no autenticado');
+        }
         
         const billingByPanel = {};
         let totalImporte = 0;
         let totalAcciones = 0;
         
-        changesQuery.forEach(doc => {
-            const change = doc.data();
-            const panelId = doc.ref.parent.parent.id;
-            
-            if (!billingByPanel[panelId]) {
-                billingByPanel[panelId] = {
-                    panelId: panelId,
-                    monthKey: monthKey,
-                    totalDiasFacturables: 0,
-                    totalImporte: 0,
-                    acciones: {}
-                };
-            }
-            
-            const billing = billingByPanel[panelId];
-            billing.totalDiasFacturables += change.diasFacturables || 0;
-            billing.totalImporte += change.importeAFacturar || 0;
-            billing.acciones[change.action] = (billing.acciones[change.action] || 0) + 1;
-            billing.lastChangeAt = change.createdAt;
-            billing.lastChangeBy = change.createdBy;
-            
-            totalImporte += change.importeAFacturar || 0;
-            totalAcciones += 1;
-        });
+        // Obtener TODOS los paneles
+        console.log('📦 Obteniendo paneles...');
+        const panelsSnapshot = await db.collection('paneles').get();
+        console.log(`✅ ${panelsSnapshot.size} paneles encontrados`);
         
-        // Actualizar documentos en lote
+        // Procesar cada panel individualmente (SIN collectionGroup)
+        for (const panelDoc of panelsSnapshot.docs) {
+            const panelId = panelDoc.id;
+            const panelData = panelDoc.data();
+            const codigo = String(panelData.codigo || panelId);
+            
+            try {
+                // Leer eventos de ESTE panel específico para el mes
+                const changesSnapshot = await db.collection('paneles')
+                    .doc(panelId)
+                    .collection('changes')
+                    .where('monthKey', '==', monthKey)
+                    .get();
+                
+                if (changesSnapshot.empty) {
+                    continue; // No hay eventos para este panel
+                }
+                
+                // Inicializar billing
+                if (!billingByPanel[codigo]) {
+                    billingByPanel[codigo] = {
+                        panelId: codigo,
+                        monthKey: monthKey,
+                        totalDiasFacturables: 0,
+                        totalImporte: 0,
+                        acciones: {},
+                        municipio: panelData.municipio || 'Desconocido'
+                    };
+                }
+                
+                const billing = billingByPanel[codigo];
+                
+                // Acumular datos de eventos
+                changesSnapshot.forEach(doc => {
+                    const change = doc.data();
+                    billing.totalDiasFacturables += change.diasFacturables || 0;
+                    billing.totalImporte += change.importeAFacturar || 0;
+                    billing.acciones[change.action] = (billing.acciones[change.action] || 0) + 1;
+                    billing.lastChangeAt = change.createdAt;
+                    billing.lastChangeBy = change.createdBy;
+                    
+                    totalImporte += change.importeAFacturar || 0;
+                    totalAcciones += 1;
+                });
+                
+            } catch (error) {
+                console.warn(`⚠️ Error en panel ${codigo}:`, error.message);
+            }
+        }
+        
+        console.log(`💾 Guardando ${Object.keys(billingByPanel).length} registros...`);
+        
+        // Guardar en batch
         const batch = db.batch();
         
-        // Actualizar facturación por panel
         Object.values(billingByPanel).forEach(billing => {
-            const docRef = db.collection('panel_month_billing')
-                .doc(`${billing.panelId}_${monthKey.replace('-', '')}`);
+            const docId = `${billing.panelId}_${monthKey.replace('-', '')}`;
+            const docRef = db.collection('panel_month_billing').doc(docId);
             batch.set(docRef, billing);
-        });
-        
-        // Actualizar resumen global
-        const summaryRef = db.collection('billing_summary').doc(monthKey.replace('-', ''));
-        batch.set(summaryRef, {
-            monthKey: monthKey,
-            totalPanelesFacturables: Object.keys(billingByPanel).length,
-            totalImporteMes: totalImporte,
-            totalAcciones: totalAcciones,
-            lastChangeAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
         await batch.commit();
         
-        console.log(`✅ Reconstrucción completada para ${monthKey}:`, {
-            paneles: Object.keys(billingByPanel).length,
-            totalImporte: totalImporte,
-            totalAcciones: totalAcciones
+        // Actualizar resumen global
+        const summaryRef = db.collection('billing_summary').doc(monthKey.replace('-', ''));
+        await summaryRef.set({
+            monthKey: monthKey,
+            totalPanelesFacturables: Object.keys(billingByPanel).length,
+            totalImporteMes: Math.round(totalImporte * 100) / 100,
+            totalAcciones: totalAcciones,
+            lastChangeAt: firebase.firestore.FieldValue.serverTimestamp()
         });
+        
+        console.log(`✅ Completado: ${Object.keys(billingByPanel).length} paneles, ${totalImporte.toFixed(2)} €`);
         
         return {
             success: true,
             paneles: Object.keys(billingByPanel).length,
-            totalImporte: totalImporte,
+            totalImporte: Math.round(totalImporte * 100) / 100,
             totalAcciones: totalAcciones
         };
         
     } catch (error) {
-        console.error('❌ Error en reconstrucción:', error);
+        console.error('❌ Error:', error);
         throw new Error(`Error reconstruyendo facturación: ${error.message}`);
     }
 }
