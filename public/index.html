@@ -11,6 +11,10 @@
     <!-- SheetJS para exportar Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
+    <!-- jsPDF para exportar PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
     <!-- Google Fonts - Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2681,7 +2685,7 @@
                     ♻️ Regenerar facturación
                 </button>
                 <button onclick="exportData()" class="btn-primary">Exportar a Excel</button>
-                <button onclick="viewHistory()" class="btn-secondary">Ver histórico mensual</button>
+                <button onclick="generarDashboardMensual()" class="btn-secondary">Dashboard Mensual</button>
                 <button onclick="viewMonthlyChanges()" class="btn-secondary">Ver cambios del mes</button>
                 <button onclick="exportHistory()" class="btn-secondary">Exportar histórico completo</button>
                 <button onclick="backupComplete()" class="btn-secondary">Copia de seguridad (JSON)</button>
@@ -5442,85 +5446,155 @@
             }
         }
 
-        // Exportar a Excel
-        function exportData() {
-            const month = document.getElementById('currentMonth').value;
-            const year = document.getElementById('currentYear').value;
+        // Exportar a Excel con información de eventos desde Firestore
+        async function exportData() {
+            const month = parseInt(document.getElementById('currentMonth').value);
+            const year = parseInt(document.getElementById('currentYear').value);
             const monthName = getMonthName(month);
+            const monthKey = `${year}-${String(month).padStart(2, '0')}`;
             
-            // Crear los datos para Excel
-            const data = [];
-            
-            // Encabezados
-            data.push(['Municipio', 'Código Parada', 'Días', 'Facturación']);
-            
-            // Datos de paneles
-            panelsData.forEach(panel => {
-                const days = calculateDays(panel, parseInt(month), parseInt(year));
-                const billing = parseFloat(calculateBilling(days));
-                data.push([
-                    panel.municipio,
-                    panel.codigo,
-                    days,
-                    billing
-                ]);
-            });
-
-            // Crear un nuevo workbook
-            const wb = XLSX.utils.book_new();
-            
-            // Crear worksheet a partir de los datos
-            const ws = XLSX.utils.aoa_to_sheet(data);
-            
-            // Aplicar formato a los encabezados (primera fila)
-            const headerStyle = {
-                font: { bold: true },
-                fill: { fgColor: { rgb: "D3D3D3" } }, // Gris claro
-                alignment: { horizontal: "center" }
-            };
-            
-            // Aplicar estilo a la primera fila (encabezados)
-            ['A1', 'B1', 'C1', 'D1'].forEach(cell => {
-                if (!ws[cell]) ws[cell] = {};
-                ws[cell].s = headerStyle;
-            });
-            
-            // Ajustar ancho de columnas automáticamente
-            const colWidths = [];
-            data.forEach(row => {
-                row.forEach((cell, i) => {
-                    const cellLength = cell ? cell.toString().length : 0;
-                    if (!colWidths[i] || colWidths[i] < cellLength) {
-                        colWidths[i] = cellLength;
-                    }
-                });
-            });
-            
-            // Establecer ancho de columnas (con un mínimo de 10 y máximo de 50)
-            ws['!cols'] = colWidths.map(width => ({
-                wch: Math.max(10, Math.min(50, width + 2))
-            }));
-            
-            // Formato para columna de facturación (números con 2 decimales)
-            const range = XLSX.utils.decode_range(ws['!ref']);
-            for (let row = 1; row <= range.e.r; row++) {
-                const cellAddress = XLSX.utils.encode_cell({ r: row, c: 3 }); // Columna D (Facturación)
-                if (ws[cellAddress] && typeof ws[cellAddress].v === 'number') {
-                    if (!ws[cellAddress].s) ws[cellAddress].s = {};
-                    ws[cellAddress].s.numFmt = '#,##0.00';
+            try {
+                showToast('📊 Generando Excel...', 'info');
+                
+                // USAR EL MISMO CÁLCULO QUE LA PANTALLA para evitar duplicados
+                const resultado = await window.calcularFacturacionDinamica(monthKey);
+                
+                if (!resultado || resultado.sinDatos) {
+                    alert(`No hay datos de facturación para ${monthName} ${year}.\n\nHaz clic en "Regenerar facturación" primero.`);
+                    return;
                 }
+                
+                // Obtener estado final de todos los paneles
+                // Primero el mes base
+                const snapshot = await firebaseDB.collection('panel_month_billing')
+                    .where('monthKey', '==', resultado.mesBase || monthKey)
+                    .get();
+                
+                // Crear mapa de paneles base (evita duplicados)
+                const panelsMap = new Map();
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    panelsMap.set(data.panelId, data);
+                });
+                
+                // Aplicar eventos del mes consultado si es diferente al mes base
+                if (monthKey !== resultado.mesBase) {
+                    const eventosSnapshot = await firebaseDB.collection('panel_month_billing')
+                        .where('monthKey', '==', monthKey)
+                        .get();
+                    
+                    eventosSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        // Actualizar o agregar panel con datos más recientes
+                        panelsMap.set(data.panelId, data);
+                    });
+                }
+                
+                const data = [];
+                
+                // Encabezados
+                data.push([
+                    'Municipio', 
+                    'Código', 
+                    'Días', 
+                    'Facturación (€)', 
+                    'N° Eventos',
+                    'Tipos de Eventos',
+                    'Última Modificación'
+                ]);
+                
+                // Procesar cada panel del mapa (sin duplicados)
+                panelsMap.forEach((billing, panelId) => {
+                    const acciones = billing.acciones || {};
+                    
+                    // Contar eventos
+                    const numEventos = Object.values(acciones).reduce((sum, count) => sum + count, 0);
+                    
+                    // Formatear tipos
+                    const tiposEventos = Object.entries(acciones)
+                        .filter(([tipo, count]) => count > 0)
+                        .map(([tipo, count]) => `${tipo}${count > 1 ? ' (×'+count+')' : ''}`)
+                        .join(', ') || 'Sin eventos';
+                    
+                    // Fecha
+                    const lastChange = billing.lastChangeAt ? 
+                        new Date(billing.lastChangeAt.toDate()).toLocaleDateString('es-ES') : 
+                        'N/A';
+                    
+                    data.push([
+                        billing.municipio || 'Desconocido',
+                        billing.panelId,
+                        billing.totalDiasFacturables || 0,
+                        billing.totalImporte || 0,
+                        numEventos,
+                        tiposEventos,
+                        lastChange
+                    ]);
+                });
+                
+                // Ordenar
+                const dataRows = data.slice(1);
+                dataRows.sort((a, b) => {
+                    if (a[0] !== b[0]) return a[0].localeCompare(b[0]);
+                    return String(a[1]).localeCompare(String(b[1]));
+                });
+                
+                const sortedData = [data[0], ...dataRows];
+                
+                // Crear Excel
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.aoa_to_sheet(sortedData);
+                
+                ws['!cols'] = [
+                    { wch: 20 }, { wch: 12 }, { wch: 8 }, { wch: 14 }, 
+                    { wch: 12 }, { wch: 35 }, { wch: 16 }
+                ];
+                
+                // Formato moneda
+                const range = XLSX.utils.decode_range(ws['!ref']);
+                for (let row = 1; row <= range.e.r; row++) {
+                    const cellD = XLSX.utils.encode_cell({ r: row, c: 3 });
+                    if (ws[cellD] && typeof ws[cellD].v === 'number') {
+                        ws[cellD].z = '#,##0.00';
+                    }
+                }
+                
+                XLSX.utils.book_append_sheet(wb, ws, `${monthName} ${year}`);
+                
+                // Resumen (usando datos correctos del cálculo)
+                const totalDias = dataRows.reduce((sum, row) => sum + (row[2] || 0), 0);
+                const totalImporte = resultado.totalImporte; // Usar el total correcto calculado
+                const totalEventos = dataRows.reduce((sum, row) => sum + (row[4] || 0), 0);
+                
+                const resumenData = [
+                    ['RESUMEN DEL MES', ''],
+                    ['', ''],
+                    ['Mes:', `${monthName} ${year}`],
+                    ['Total Paneles:', dataRows.length],
+                    ['Total Días Facturables:', totalDias],
+                    ['Total Facturación:', totalImporte.toFixed(2)],
+                    ['Total Eventos:', totalEventos],
+                    ['', ''],
+                    ['Generado:', new Date().toLocaleString('es-ES')]
+                ];
+                
+                const wsResumen = XLSX.utils.aoa_to_sheet(resumenData);
+                wsResumen['!cols'] = [{ wch: 25 }, { wch: 20 }];
+                XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen');
+                
+                // Descargar
+                const fileName = `facturacion_${monthName.toLowerCase()}_${year}.xlsx`;
+                XLSX.writeFile(wb, fileName);
+                
+                showToast(`✅ Excel generado: ${dataRows.length} paneles, ${totalImporte.toFixed(2)} €`, 'success');
+                
+            } catch (error) {
+                console.error('❌ Error generando Excel:', error);
+                const mensaje = error.code === 'permission-denied' 
+                    ? 'No tienes permisos para acceder a los datos'
+                    : `Error al generar Excel: ${error.message}`;
+                alert(mensaje);
             }
-            
-            // Agregar worksheet al workbook
-            XLSX.utils.book_append_sheet(wb, ws, `Paneles ${monthName} ${year}`);
-            
-            // Generar nombre de archivo
-            const fileName = `paneles_${monthName.toLowerCase()}_${year}.xlsx`;
-            
-            // Descargar el archivo
-            XLSX.writeFile(wb, fileName);
-            
-            console.log(`✅ Archivo Excel generado: ${fileName}`);
         }
 
         // Función auxiliar para obtener nombre del mes
@@ -5573,8 +5647,536 @@
             openModal('historyModal');
         }
 
-        // Ver cambios del mes registrados
-        function viewMonthlyChanges() {
+        // Ver cambios del mes registrados desde Firestore
+        async function viewMonthlyChanges() {
+            try {
+                // SOLO LECTURA: Obtener mes/año seleccionado
+                const month = parseInt(document.getElementById('currentMonth').value);
+                const year = parseInt(document.getElementById('currentYear').value);
+                const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+                const monthName = getMonthName(month);
+                
+                showToast('📊 Cargando cambios del mes...', 'info');
+                
+                // SOLO LECTURA: Usar el mismo cálculo que la pantalla
+                const resultado = await window.calcularFacturacionDinamica(monthKey);
+                
+                if (!resultado || resultado.desglose.length === 0) {
+                    alert(`No hay cambios registrados para ${monthName} ${year}.\n\nLos cambios se registran cuando realizas operaciones como altas, desmontajes, etc.`);
+                    return;
+                }
+                
+                // PROCESAMIENTO EN MEMORIA: Calcular totales
+                const cambios = resultado.desglose;
+                let totalEventos = 0;
+                let totalDiferencia = 0;
+                
+                cambios.forEach(cambio => {
+                    totalEventos += cambio.eventos || 0;
+                    totalDiferencia += cambio.diferenciaImporte || 0;
+                });
+                
+                // GENERAR HTML para mostrar
+                let html = `
+                    <div style="padding: 24px;">
+                        <div style="background: var(--gray-lighter); padding: 20px; border-radius: 8px; margin-bottom: 24px;">
+                            <h3 style="margin: 0 0 16px 0; color: var(--black);">📊 Resumen de Cambios - ${monthName} ${year}</h3>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+                                <div>
+                                    <div style="font-size: 13px; color: var(--gray); margin-bottom: 4px;">Total eventos</div>
+                                    <div style="font-size: 24px; font-weight: 700; color: var(--black);">${totalEventos}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 13px; color: var(--gray); margin-bottom: 4px;">Paneles afectados</div>
+                                    <div style="font-size: 24px; font-weight: 700; color: var(--black);">${cambios.length}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 13px; color: var(--gray); margin-bottom: 4px;">Diferencia total</div>
+                                    <div style="font-size: 24px; font-weight: 700; color: ${totalDiferencia >= 0 ? 'var(--green)' : 'var(--red)'};">${totalDiferencia >= 0 ? '+' : ''}${totalDiferencia.toFixed(2)} €</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <h4 style="margin-bottom: 16px; color: var(--gray-dark);">Desglose por panel:</h4>
+                        <div style="max-height: 500px; overflow-y: auto;">
+                            ${cambios.map((cambio, index) => `
+                                <div style="border: 1px solid var(--border-color); padding: 16px; margin-bottom: 12px; border-radius: 8px; background: white;">
+                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                                        <div>
+                                            <h4 style="margin: 0; font-size: 16px; color: var(--black);">🔵 ${cambio.panelId} - ${cambio.municipio}</h4>
+                                            <div style="font-size: 12px; color: var(--gray); margin-top: 4px;">Mes: ${cambio.monthKey}</div>
+                                        </div>
+                                        <div style="background: ${cambio.eventos > 0 ? 'rgba(16, 185, 129, 0.1)' : 'var(--gray-lighter)'}; color: ${cambio.eventos > 0 ? 'var(--green)' : 'var(--gray)'}; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">
+                                            ${cambio.eventos} evento${cambio.eventos !== 1 ? 's' : ''}
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; font-size: 14px;">
+                                        <div>
+                                            <div style="color: var(--gray); font-size: 12px; margin-bottom: 4px;">📅 Días facturables</div>
+                                            <div style="font-weight: 500;">
+                                                ${cambio.diasBase} → ${cambio.diasNuevos} 
+                                                <span style="color: ${cambio.diferenciaDias >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight: 600;">
+                                                    (${cambio.diferenciaDias >= 0 ? '+' : ''}${cambio.diferenciaDias})
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div style="color: var(--gray); font-size: 12px; margin-bottom: 4px;">💰 Importe</div>
+                                            <div style="font-weight: 500;">
+                                                ${cambio.importeBase.toFixed(2)} € → ${cambio.importeNuevo.toFixed(2)} € 
+                                                <span style="color: ${cambio.diferenciaImporte >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight: 600;">
+                                                    (${cambio.diferenciaImporte >= 0 ? '+' : ''}${cambio.diferenciaImporte.toFixed(2)} €)
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--gray-lighter);">
+                                        <div style="color: var(--gray); font-size: 12px; margin-bottom: 4px;">📋 Tipos de eventos</div>
+                                        <div style="font-weight: 600; color: var(--blue); font-size: 14px;">
+                                            ${cambio.acciones ? Object.entries(cambio.acciones)
+                                                .filter(([tipo, count]) => count > 0)
+                                                .map(([tipo, count]) => `${tipo}${count > 1 ? ' (×'+count+')' : ''}`)
+                                                .join(', ') : 'Sin especificar'}
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                
+                // SOLO VISUALIZACIÓN: Crear y mostrar modal
+                const modal = document.createElement('div');
+                modal.className = 'temp-modal';
+                modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 20px;';
+                
+                const content = document.createElement('div');
+                content.style.cssText = 'background: white; border-radius: 12px; max-width: 1200px; width: 100%; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.3);';
+                
+                content.innerHTML = `
+                    <div style="padding: 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--gray-lighter);">
+                        <h2 style="color: var(--black); margin: 0; font-size: 20px;">Cambios del Mes</h2>
+                        <button onclick="this.closest('.temp-modal').remove()" style="background: none; border: none; font-size: 28px; cursor: pointer; color: var(--gray); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 4px; transition: background 0.2s;" onmouseover="this.style.background='var(--gray-light)'" onmouseout="this.style.background='none'">×</button>
+                    </div>
+                    <div style="overflow-y: auto; flex: 1;">
+                        ${html}
+                    </div>
+                `;
+                
+                modal.appendChild(content);
+                document.body.appendChild(modal);
+                
+                // Cerrar al hacer clic fuera del modal
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.remove();
+                    }
+                });
+                
+                showToast(`✅ ${cambios.length} cambios encontrados`, 'success');
+                
+            } catch (error) {
+                console.error('❌ Error al cargar cambios del mes:', error);
+                showToast('Error al cargar cambios', 'error');
+                alert(`Error al cargar cambios:\n${error.message}`);
+            }
+        }
+        
+        // Generar Dashboard Mensual - Informe profesional del mes
+        async function generarDashboardMensual() {
+            try {
+                // SOLO LECTURA: Obtener mes/año seleccionado
+                const month = parseInt(document.getElementById('currentMonth').value);
+                const year = parseInt(document.getElementById('currentYear').value);
+                const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+                const monthName = getMonthName(month);
+                
+                showToast('📊 Generando Dashboard Mensual...', 'info');
+                
+                // SOLO LECTURA: Obtener datos del mes
+                const resultado = await window.calcularFacturacionDinamica(monthKey);
+                
+                if (!resultado || resultado.sinDatos) {
+                    alert(`No hay datos disponibles para ${monthName} ${year}.\n\nPor favor, regenera la facturación primero.`);
+                    return;
+                }
+                
+                // SOLO LECTURA: Obtener todos los paneles del mes
+                const snapshot = await firebaseDB.collection('panel_month_billing')
+                    .where('monthKey', '==', monthKey)
+                    .get();
+                
+                // PROCESAMIENTO EN MEMORIA: Categorizar paneles
+                const categorizados = {
+                    completos: [],
+                    parciales: [],
+                    sinFacturacion: [],
+                    movimientos: {
+                        altas: [],
+                        desmontajes: [],
+                        reinstalaciones: [],
+                        cambiosTarifa: []
+                    },
+                    resumenEventos: {
+                        ALTA: 0,
+                        DESMONTAJE: 0,
+                        REINSTALACION: 0,
+                        CAMBIO_TARIFA: 0,
+                        OTROS: 0
+                    }
+                };
+                
+                let totalImporteCompletos = 0;
+                let totalImporteParciales = 0;
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const dias = data.totalDiasFacturables || 0;
+                    const importe = data.totalImporte || 0;
+                    const acciones = data.acciones || {};
+                    
+                    // Categorizar por días facturados
+                    if (dias === 30) {
+                        categorizados.completos.push(data);
+                        totalImporteCompletos += importe;
+                    } else if (dias > 0 && dias < 30) {
+                        categorizados.parciales.push(data);
+                        totalImporteParciales += importe;
+                    } else if (dias === 0) {
+                        categorizados.sinFacturacion.push(data);
+                    }
+                    
+                    // Categorizar por eventos (excluyendo automáticos)
+                    const esAutomatico = acciones.REGENERACION_CSV || data.copiadoDe;
+                    
+                    if (!esAutomatico) {
+                        if (acciones.ALTA) {
+                            categorizados.movimientos.altas.push(data);
+                            categorizados.resumenEventos.ALTA += acciones.ALTA;
+                        }
+                        if (acciones.DESMONTAJE) {
+                            categorizados.movimientos.desmontajes.push(data);
+                            categorizados.resumenEventos.DESMONTAJE += acciones.DESMONTAJE;
+                        }
+                        if (acciones.REINSTALACION) {
+                            categorizados.movimientos.reinstalaciones.push(data);
+                            categorizados.resumenEventos.REINSTALACION += acciones.REINSTALACION;
+                        }
+                        if (acciones.CAMBIO_TARIFA) {
+                            categorizados.movimientos.cambiosTarifa.push(data);
+                            categorizados.resumenEventos.CAMBIO_TARIFA += acciones.CAMBIO_TARIFA;
+                        }
+                        
+                        // Contar otros eventos
+                        Object.keys(acciones).forEach(tipo => {
+                            if (!['ALTA', 'DESMONTAJE', 'REINSTALACION', 'CAMBIO_TARIFA', 'REGENERACION_CSV'].includes(tipo)) {
+                                categorizados.resumenEventos.OTROS += acciones[tipo];
+                            }
+                        });
+                    }
+                });
+                
+                const totalPaneles = snapshot.size;
+                const totalEventos = Object.values(categorizados.resumenEventos).reduce((a, b) => a + b, 0);
+                const fechaGeneracion = new Date().toLocaleString('es-ES');
+                
+                // GENERAR HTML del dashboard
+                const html = `
+                    <div id="dashboardContent" style="padding: 32px; font-family: 'Inter', sans-serif; color: #1f2937; background: #f9fafb;">
+                        
+                        <!-- Header -->
+                        <div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 3px solid #2563eb;">
+                            <h1 style="font-size: 32px; font-weight: 700; color: #1e3a8a; margin: 0 0 8px 0;">📊 DASHBOARD MENSUAL</h1>
+                            <h2 style="font-size: 24px; font-weight: 600; color: #3b82f6; margin: 0 0 12px 0;">${monthName} ${year}</h2>
+                            <p style="font-size: 14px; color: #6b7280; margin: 0;">Consorcio Regional de Transportes de Madrid</p>
+                            <p style="font-size: 12px; color: #9ca3af; margin: 4px 0 0 0;">Generado: ${fechaGeneracion}</p>
+                        </div>
+                        
+                        <!-- Resumen Ejecutivo -->
+                        <div style="background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h3 style="font-size: 18px; font-weight: 600; color: #1f2937; margin: 0 0 20px 0; padding-bottom: 12px; border-bottom: 2px solid #e5e7eb;">📈 RESUMEN EJECUTIVO</h3>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 8px; color: white;">
+                                    <div style="font-size: 40px; font-weight: 700; margin-bottom: 8px;">${totalPaneles}</div>
+                                    <div style="font-size: 14px; opacity: 0.9;">Paneles Activos</div>
+                                </div>
+                                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 8px; color: white;">
+                                    <div style="font-size: 40px; font-weight: 700; margin-bottom: 8px;">${resultado.totalImporte.toFixed(2)} €</div>
+                                    <div style="font-size: 14px; opacity: 0.9;">Facturación Total</div>
+                                </div>
+                                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 8px; color: white;">
+                                    <div style="font-size: 40px; font-weight: 700; margin-bottom: 8px;">${totalEventos}</div>
+                                    <div style="font-size: 14px; opacity: 0.9;">Eventos del Mes</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Estado de la Flota -->
+                        <div style="background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h3 style="font-size: 18px; font-weight: 600; color: #1f2937; margin: 0 0 20px 0; padding-bottom: 12px; border-bottom: 2px solid #e5e7eb;">💼 ESTADO DE LA FLOTA</h3>
+                            
+                            <div style="margin-bottom: 20px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                    <span style="font-size: 14px; font-weight: 600; color: #374151;">Facturación Completa (30 días)</span>
+                                    <span style="font-size: 14px; font-weight: 600; color: #10b981;">${categorizados.completos.length} paneles (${((categorizados.completos.length / totalPaneles) * 100).toFixed(1)}%)</span>
+                                </div>
+                                <div style="width: 100%; height: 24px; background: #e5e7eb; border-radius: 12px; overflow: hidden;">
+                                    <div style="width: ${(categorizados.completos.length / totalPaneles) * 100}%; height: 100%; background: linear-gradient(90deg, #10b981 0%, #059669 100%);"></div>
+                                </div>
+                                <div style="text-align: right; font-size: 13px; color: #6b7280; margin-top: 4px;">${totalImporteCompletos.toFixed(2)} €</div>
+                            </div>
+                            
+                            <div style="margin-bottom: 20px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                    <span style="font-size: 14px; font-weight: 600; color: #374151;">Facturación Parcial (&lt;30 días)</span>
+                                    <span style="font-size: 14px; font-weight: 600; color: #f59e0b;">${categorizados.parciales.length} paneles (${((categorizados.parciales.length / totalPaneles) * 100).toFixed(1)}%)</span>
+                                </div>
+                                <div style="width: 100%; height: 24px; background: #e5e7eb; border-radius: 12px; overflow: hidden;">
+                                    <div style="width: ${(categorizados.parciales.length / totalPaneles) * 100}%; height: 100%; background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);"></div>
+                                </div>
+                                <div style="text-align: right; font-size: 13px; color: #6b7280; margin-top: 4px;">${totalImporteParciales.toFixed(2)} €</div>
+                            </div>
+                            
+                            <div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                    <span style="font-size: 14px; font-weight: 600; color: #374151;">Sin Facturación</span>
+                                    <span style="font-size: 14px; font-weight: 600; color: #ef4444;">${categorizados.sinFacturacion.length} paneles (${((categorizados.sinFacturacion.length / totalPaneles) * 100).toFixed(1)}%)</span>
+                                </div>
+                                <div style="width: 100%; height: 24px; background: #e5e7eb; border-radius: 12px; overflow: hidden;">
+                                    <div style="width: ${(categorizados.sinFacturacion.length / totalPaneles) * 100}%; height: 100%; background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);"></div>
+                                </div>
+                                <div style="text-align: right; font-size: 13px; color: #6b7280; margin-top: 4px;">0,00 €</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Movimientos del Mes -->
+                        <div style="background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h3 style="font-size: 18px; font-weight: 600; color: #1f2937; margin: 0 0 20px 0; padding-bottom: 12px; border-bottom: 2px solid #e5e7eb;">🔄 MOVIMIENTOS DEL MES</h3>
+                            
+                            ${generarSeccionMovimientos('🆕 ALTAS Y NUEVAS INSTALACIONES', categorizados.movimientos.altas, '#10b981')}
+                            ${generarSeccionMovimientos('🔨 DESMONTAJES', categorizados.movimientos.desmontajes, '#ef4444')}
+                            ${generarSeccionMovimientos('♻️ REINSTALACIONES', categorizados.movimientos.reinstalaciones, '#3b82f6')}
+                            ${generarSeccionMovimientos('💰 CAMBIOS DE TARIFA', categorizados.movimientos.cambiosTarifa, '#8b5cf6')}
+                        </div>
+                        
+                        <!-- Paneles con Facturación Parcial -->
+                        ${categorizados.parciales.length > 0 ? `
+                        <div style="background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h3 style="font-size: 18px; font-weight: 600; color: #1f2937; margin: 0 0 20px 0; padding-bottom: 12px; border-bottom: 2px solid #e5e7eb;">⚠️ PANELES CON FACTURACIÓN PARCIAL</h3>
+                            ${categorizados.parciales.map(panel => {
+                                const acciones = panel.acciones || {};
+                                const tiposEventos = Object.entries(acciones)
+                                    .filter(([tipo, count]) => count > 0 && tipo !== 'REGENERACION_CSV')
+                                    .map(([tipo, count]) => `${tipo}${count > 1 ? ' (×'+count+')' : ''}`)
+                                    .join(', ') || 'Sin especificar';
+                                return `
+                                <div style="padding: 16px; margin-bottom: 12px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
+                                    <div style="font-weight: 600; color: #92400e; margin-bottom: 4px;">• Panel ${panel.panelId} - ${panel.municipio}</div>
+                                    <div style="font-size: 13px; color: #78350f;">Días facturados: ${panel.totalDiasFacturables} de 30 días (${((panel.totalDiasFacturables / 30) * 100).toFixed(1)}%)</div>
+                                    <div style="font-size: 13px; color: #78350f;">Importe: ${panel.totalImporte.toFixed(2)} € (vs ${(37.7).toFixed(2)} € mes completo)</div>
+                                    <div style="font-size: 13px; color: #78350f;">Motivo: ${tiposEventos}</div>
+                                </div>
+                                `;
+                            }).join('')}
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Resumen de Eventos -->
+                        <div style="background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h3 style="font-size: 18px; font-weight: 600; color: #1f2937; margin: 0 0 20px 0; padding-bottom: 12px; border-bottom: 2px solid #e5e7eb;">📊 RESUMEN DE EVENTOS</h3>
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: #f3f4f6;">
+                                        <th style="padding: 12px; text-align: left; font-size: 13px; color: #374151; border-bottom: 2px solid #e5e7eb;">Tipo de Evento</th>
+                                        <th style="padding: 12px; text-align: center; font-size: 13px; color: #374151; border-bottom: 2px solid #e5e7eb;">Cantidad</th>
+                                        <th style="padding: 12px; text-align: center; font-size: 13px; color: #374151; border-bottom: 2px solid #e5e7eb;">Paneles Afectados</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${generarFilaEvento('ALTA', categorizados.resumenEventos.ALTA, categorizados.movimientos.altas.length)}
+                                    ${generarFilaEvento('DESMONTAJE', categorizados.resumenEventos.DESMONTAJE, categorizados.movimientos.desmontajes.length)}
+                                    ${generarFilaEvento('REINSTALACIÓN', categorizados.resumenEventos.REINSTALACION, categorizados.movimientos.reinstalaciones.length)}
+                                    ${generarFilaEvento('CAMBIO_TARIFA', categorizados.resumenEventos.CAMBIO_TARIFA, categorizados.movimientos.cambiosTarifa.length)}
+                                    ${generarFilaEvento('OTROS', categorizados.resumenEventos.OTROS, 0)}
+                                    <tr style="background: #f9fafb; font-weight: 600; border-top: 2px solid #e5e7eb;">
+                                        <td style="padding: 12px; font-size: 14px; color: #1f2937;">TOTAL</td>
+                                        <td style="padding: 12px; text-align: center; font-size: 14px; color: #1f2937;">${totalEventos}</td>
+                                        <td style="padding: 12px; text-align: center; font-size: 14px; color: #1f2937;">${categorizados.movimientos.altas.length + categorizados.movimientos.desmontajes.length + categorizados.movimientos.reinstalaciones.length + categorizados.movimientos.cambiosTarifa.length}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <div style="margin-top: 16px; padding: 12px; background: #f0fdf4; border-radius: 6px; font-size: 13px; color: #166534;">
+                                <strong>Paneles sin modificaciones:</strong> ${totalPaneles - (categorizados.movimientos.altas.length + categorizados.movimientos.desmontajes.length + categorizados.movimientos.reinstalaciones.length + categorizados.movimientos.cambiosTarifa.length)} (${(((totalPaneles - (categorizados.movimientos.altas.length + categorizados.movimientos.desmontajes.length + categorizados.movimientos.reinstalaciones.length + categorizados.movimientos.cambiosTarifa.length)) / totalPaneles) * 100).toFixed(1)}%)
+                            </div>
+                        </div>
+                        
+                        <!-- Notas y Observaciones -->
+                        <div style="background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h3 style="font-size: 18px; font-weight: 600; color: #1f2937; margin: 0 0 16px 0; padding-bottom: 12px; border-bottom: 2px solid #e5e7eb;">📄 NOTAS Y OBSERVACIONES</h3>
+                            <ul style="margin: 0; padding-left: 20px; font-size: 14px; color: #4b5563; line-height: 1.8;">
+                                <li>El ${((categorizados.completos.length / totalPaneles) * 100).toFixed(1)}% de los paneles mantiene facturación completa</li>
+                                <li>Se registraron ${totalEventos} evento${totalEventos !== 1 ? 's' : ''} en el mes</li>
+                                <li>Nivel de operación: ${totalEventos < 5 ? 'ESTABLE' : totalEventos < 20 ? 'MODERADO' : 'ALTO'}</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Botones de Exportación -->
+                        <div style="margin-top: 32px; display: flex; gap: 16px; justify-content: center;">
+                            <button onclick="exportarDashboardPDF()" style="padding: 12px 32px; background: #ef4444; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);">
+                                📄 Exportar PDF
+                            </button>
+                            <button onclick="exportarDashboardExcel()" style="padding: 12px 32px; background: #10b981; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">
+                                📊 Exportar Excel
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                // Funciones auxiliares para generar HTML
+                function generarSeccionMovimientos(titulo, items, color) {
+                    if (items.length === 0) {
+                        return `
+                            <div style="margin-bottom: 20px;">
+                                <h4 style="font-size: 15px; font-weight: 600; color: ${color}; margin: 0 0 12px 0;">${titulo}</h4>
+                                <div style="padding: 16px; background: #f9fafb; border-radius: 6px; font-size: 13px; color: #6b7280;">
+                                    No se registraron movimientos en esta categoría
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    return `
+                        <div style="margin-bottom: 20px;">
+                            <h4 style="font-size: 15px; font-weight: 600; color: ${color}; margin: 0 0 12px 0;">${titulo}</h4>
+                            ${items.map(panel => {
+                                const fecha = panel.lastChangeAt ? new Date(panel.lastChangeAt.toDate()).toLocaleDateString('es-ES') : 'N/A';
+                                return `
+                                <div style="padding: 12px; margin-bottom: 8px; background: #f9fafb; border-left: 3px solid ${color}; border-radius: 4px; font-size: 13px;">
+                                    <div style="font-weight: 600; color: #1f2937;">• Panel ${panel.panelId} - ${panel.municipio}</div>
+                                    <div style="color: #6b7280; margin-top: 4px;">Fecha: ${fecha} | Período: ${panel.totalDiasFacturables} días | Importe: ${panel.totalImporte.toFixed(2)} €</div>
+                                </div>
+                                `;
+                            }).join('')}
+                            <div style="margin-top: 8px; font-size: 13px; color: #6b7280; font-weight: 600;">Total: ${items.length} ${items.length === 1 ? 'movimiento' : 'movimientos'}</div>
+                        </div>
+                    `;
+                }
+                
+                function generarFilaEvento(tipo, cantidad, paneles) {
+                    return `
+                        <tr style="border-bottom: 1px solid #e5e7eb;">
+                            <td style="padding: 12px; font-size: 13px; color: #374151;">${tipo}</td>
+                            <td style="padding: 12px; text-align: center; font-size: 13px; color: #374151;">${cantidad}</td>
+                            <td style="padding: 12px; text-align: center; font-size: 13px; color: #374151;">${paneles}</td>
+                        </tr>
+                    `;
+                }
+                
+                // SOLO VISUALIZACIÓN: Mostrar modal
+                const modal = document.createElement('div');
+                modal.className = 'dashboard-modal';
+                modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 20px;';
+                
+                const content = document.createElement('div');
+                content.style.cssText = 'background: white; border-radius: 16px; max-width: 1400px; width: 100%; max-height: 95vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);';
+                
+                content.innerHTML = `
+                    <div style="padding: 20px 32px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white;">
+                        <h2 style="margin: 0; font-size: 22px; font-weight: 700;">📊 Dashboard Mensual - ${monthName} ${year}</h2>
+                        <button onclick="this.closest('.dashboard-modal').remove()" style="background: rgba(255,255,255,0.2); border: none; color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 24px; display: flex; align-items: center; justify-content: center; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">×</button>
+                    </div>
+                    <div style="overflow-y: auto; flex: 1; background: #f9fafb;">
+                        ${html}
+                    </div>
+                `;
+                
+                modal.appendChild(content);
+                document.body.appendChild(modal);
+                
+                // Cerrar al hacer clic fuera
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.remove();
+                    }
+                });
+                
+                showToast('✅ Dashboard generado correctamente', 'success');
+                
+            } catch (error) {
+                console.error('❌ Error generando dashboard:', error);
+                showToast('Error al generar dashboard', 'error');
+                alert(`Error al generar dashboard:\n${error.message}`);
+            }
+        }
+        
+        // Exportar Dashboard a PDF
+        function exportarDashboardPDF() {
+            showToast('📄 Generando PDF...', 'info');
+            
+            const elemento = document.getElementById('dashboardContent');
+            
+            html2canvas(elemento, {
+                scale: 2,
+                useCORS: true,
+                logging: false
+            }).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
+                
+                const imgWidth = 210;
+                const pageHeight = 297;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                let heightLeft = imgHeight;
+                let position = 0;
+                
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+                
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+                
+                const month = parseInt(document.getElementById('currentMonth').value);
+                const year = parseInt(document.getElementById('currentYear').value);
+                const monthName = getMonthName(month);
+                
+                pdf.save(`dashboard_mensual_${monthName.toLowerCase()}_${year}.pdf`);
+                showToast('✅ PDF generado correctamente', 'success');
+            }).catch(error => {
+                console.error('Error generando PDF:', error);
+                showToast('Error al generar PDF', 'error');
+            });
+        }
+        
+        // Exportar Dashboard a Excel
+        function exportarDashboardExcel() {
+            showToast('📊 Generando Excel...', 'info');
+            
+            try {
+                const month = parseInt(document.getElementById('currentMonth').value);
+                const year = parseInt(document.getElementById('currentYear').value);
+                const monthName = getMonthName(month);
+                
+                // Crear workbook con múltiples hojas
+                const wb = XLSX.utils.book_new();
+                
+                // Nota: Aquí se puede implementar la generación del Excel
+                // Por ahora, mostrar mensaje
+                alert('La funcionalidad de exportar a Excel se implementará próximamente.');
+                
+            } catch (error) {
+                console.error('Error generando Excel:', error);
+                showToast('Error al generar Excel', 'error');
+            }
+        }
+        
+        // Ver cambios del mes registrados (LEGACY - mantenido para compatibilidad)
+        function viewMonthlyChangesLegacy() {
             if (Object.keys(monthlyChanges).length === 0) {
                 alert(' No hay cambios mensuales registrados.\n\nLos cambios se registran automáticamente cuando procesas el archivo de cambios mensuales.');
                 return;
@@ -7974,6 +8576,7 @@
                             municipio: data.municipio || estadoAnterior.municipio,
                             monthKey: monthKey,
                             eventos: numEventos,
+                            acciones: acciones,
                             diasBase: estadoAnterior.dias,
                             diasNuevos: diasNuevos,
                             diferenciaDias: diferenciaDias,
