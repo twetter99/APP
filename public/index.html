@@ -2665,10 +2665,6 @@
                         <span class="dropdown-icon" style="color: #2196F3;">↻</span>
                         <span>Reinstalación de Panel</span>
                     </div>
-                    <div class="dropdown-item" data-action="baja" onclick="openModalBaja()">
-                        <span class="dropdown-icon" style="color: #F44336;"></span>
-                        <span>Baja Definitiva de Panel</span>
-                    </div>
                     <div class="dropdown-item" data-action="desmontaje" onclick="openModalDesmontaje()">
                         <span class="dropdown-icon" style="color: #FF9800;"></span>
                         <span>Desmontaje Temporal</span>
@@ -2806,72 +2802,6 @@
             </div>
         </div>
 
-    <!-- Modal: Baja Definitiva de Panel -->
-        <div id="modalBaja" class="modal-overlay hidden">
-            <div class="modal-content modal-baja">
-                <div class="modal-header">
-                    <h2><span></span> Baja Definitiva de Panel</h2>
-                    <button class="modal-close" onclick="closeModal('modalBaja')">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label>Buscar Panel *</label>
-                        <div id="bajaPanelPicker"></div>
-                    </div>
-                    <div class="form-group">
-                        <label>Panel Seleccionado</label>
-                        <div id="bajaPanelInfo" style="padding: 12px; background: #F9FAFB; border-radius: 8px; font-size: 14px; color: #64748B;">
-                            Ningún panel seleccionado
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="bajaMotivo">Motivo de la Baja *</label>
-                        <select id="bajaMotivo" required>
-                            <option value="">Seleccionar motivo...</option>
-                            <option value="fin_contrato">Fin de contrato</option>
-                            <option value="averia_irreparable">Avería irreparable</option>
-                            <option value="vandalismo">Vandalismo</option>
-                            <option value="decision_cliente">Decisiñn del cliente</option>
-                            <option value="otro">Otro</option>
-                        </select>
-                    </div>
-
-                    <div class="warning-box">
-                        <div class="warning-box-icon"></div>
-                        <div class="warning-box-text">
-                            <strong>Atenciñn:</strong> Esta acciñn es definitiva. El panel dejará de facturarse desde este mes en adelante. La Facturación de meses anteriores se conserva.
-                        </div>
-                    </div>
-
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="bajaConfirmacion">
-                        <label for="bajaConfirmacion">Confirmo que deseo dar de baja definitivamente este panel</label>
-                    </div>
-
-                    <div class="billing-preview" id="bajaBillingPreview">
-                        <h3> Impacto en Facturación</h3>
-                        <div class="billing-row">
-                            <span class="billing-label">Importe mensual actual:</span>
-                            <span class="billing-value" id="bajaFacturacionActual">-</span>
-                        </div>
-                        <div class="billing-row">
-                            <span class="billing-label">Importe después de baja:</span>
-                            <span class="billing-value">0,00 €</span>
-                        </div>
-                        <div class="billing-row">
-                            <span class="billing-label">Pérdida mensual:</span>
-                            <span class="billing-value" id="bajaPerdida" style="color: #DC2626;">-</span>
-                        </div>
-                    </div>
-
-                    <div class="modal-actions">
-                        <button class="btn-modal-secondary" onclick="closeModal('modalBaja')">Cancelar</button>
-                        <button class="btn-modal-primary" onclick="guardarBaja()" style="background: #DC2626;"> Dar de Baja</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Modal: Desmontaje Temporal -->
         <div id="modalDesmontaje" class="modal-overlay hidden">
             <div class="modal-content modal-desmontaje">
@@ -2972,7 +2902,6 @@
                             <option value="ALTA">ALTA</option>
                             <option value="REINSTALACION">REINSTALACIÓN</option>
                             <option value="DESMONTAJE_TEMPORAL">DESMONTAJE TEMPORAL</option>
-                            <option value="BAJA_DEFINITIVA">BAJA DEFINITIVA</option>
                             <option value="CAMBIO_TARIFA">CAMBIO DE TARIFA</option>
                         </select>
                     </div>
@@ -6351,175 +6280,6 @@
         }
 
         // ====================
-        // MODAL: BAJA DEFINITIVA
-        // ====================
-
-        let panelSeleccionadoBaja = null;
-
-        function openModalBaja() {
-            const modal = document.getElementById('modalBaja');
-            
-            // Inicializar PanelPicker
-            createPanelPicker('bajaPanelPicker', {
-                onChange: (panel) => {
-                    panelSeleccionadoBaja = panel;
-                    actualizarVistaPreviewBaja();
-                },
-                onClear: () => {
-                    panelSeleccionadoBaja = null;
-                    actualizarVistaPreviewBaja();
-                }
-            });
-            
-            modal.classList.remove('hidden');
-            setTimeout(() => modal.classList.add('show'), 10);
-            panelSeleccionadoBaja = null;
-        }
-
-        function seleccionarPanelBaja(codigo) {
-            panelSeleccionadoBaja = panelsData.find(p => p.codigo === codigo);
-            
-            if (panelSeleccionadoBaja) {
-                document.getElementById('bajaPanelInfo').innerHTML = `
-                    <strong>${panelSeleccionadoBaja.codigo}</strong><br>
-                    <span style="color: #64748B; font-size: 13px;">
-                        ${panelSeleccionadoBaja.municipio}  Tarifa: ${formatEuro(panelSeleccionadoBaja.tarifa || 37.70)}/mes
-                    </span>
-                `;
-                
-                document.getElementById('bajaResults').classList.remove('show');
-                document.getElementById('bajaBuscar').value = panelSeleccionadoBaja.codigo;
-                
-                // Actualizar preview
-                document.getElementById('bajaFacturacionActual').textContent = formatEuro(panelSeleccionadoBaja.tarifa || 37.70);
-                document.getElementById('bajaPerdida').textContent = formatEuro(panelSeleccionadoBaja.tarifa || 37.70);
-            }
-        }
-
-        function actualizarVistaPreviewBaja() {
-            const panelInfo = document.getElementById('bajaPanelInfo');
-            const facturacionActualEl = document.getElementById('bajaFacturacionActual');
-            const perdidaEl = document.getElementById('bajaPerdida');
-            
-            if (!panelInfo || !facturacionActualEl || !perdidaEl) {
-                console.warn('⚠️ Elementos del modal de baja no encontrados');
-                return;
-            }
-            
-            if (panelSeleccionadoBaja) {
-                panelInfo.innerHTML = `
-                    <strong>${panelSeleccionadoBaja.codigo}</strong><br>
-                    <span style="color: #64748B; font-size: 13px;">
-                        ${panelSeleccionadoBaja.municipio} — Tarifa: ${formatearImporteEuro(panelSeleccionadoBaja.tarifa || 37.70)}/mes
-                    </span>
-                `;
-                
-                // Actualizar preview de facturación
-                facturacionActualEl.textContent = formatearImporteEuro(panelSeleccionadoBaja.tarifa || 37.70);
-                perdidaEl.textContent = formatearImporteEuro(panelSeleccionadoBaja.tarifa || 37.70);
-            } else {
-                panelInfo.innerHTML = 'Ningún panel seleccionado';
-                facturacionActualEl.textContent = '-';
-                perdidaEl.textContent = '-';
-            }
-        }
-
-        async function guardarBaja() {
-            if (!panelSeleccionadoBaja) {
-                showToast('❌ Por favor selecciona un panel', 'error');
-                return;
-            }
-
-            const motivo = document.getElementById('bajaMotivo').value;
-            const confirmacion = document.getElementById('bajaConfirmacion').checked;
-
-            if (!motivo) {
-                showToast('❌ Por favor selecciona el motivo de la baja', 'error');
-                return;
-            }
-
-            if (!confirmacion) {
-                showToast('❌ Debes confirmar la baja definitiva del panel', 'error');
-                return;
-            }
-
-            try {
-                // Obtener usuario actual
-                const user = firebase.auth().currentUser;
-                if (!user) {
-                    throw new Error('Usuario no autenticado');
-                }
-
-                showToast('Aplicando baja definitiva...', 'info');
-
-                // Aplicar cambio usando BillingService
-                const payload = {
-                    action: BillingService.CHANGE_ACTIONS.BAJA_DEFINITIVA,
-                    effectiveDate: new Date().toISOString().split('T')[0], // Fecha actual
-                    motivo: motivo,
-                    tarifaBaseMes: panelSeleccionadoBaja.tarifa || BillingService.TARIFA_BASE_2025,
-                    uid: user.uid,
-                    email: user.email
-                };
-
-                const result = await BillingService.applyChange(
-                    panelSeleccionadoBaja.codigo,
-                    payload
-                );
-
-                if (result.success) {
-                    if (result.duplicate) {
-                        showToast('Baja ya aplicada anteriormente', 'warning');
-                    } else {
-                        // Actualizar datos locales - marcar como BAJA en lugar de eliminar
-                        const panel = panelsData.find(p => p.codigo === panelSeleccionadoBaja.codigo);
-                        if (panel) {
-                            panel.estadoActual = BillingService.PANEL_STATES.BAJA;
-                            panel.fechaBaja = new Date().toISOString().split('T')[0];
-                            panel.motivoBaja = motivo;
-                        }
-
-                        // Registrar cambio en el sistema legacy si existe
-                        if (typeof monthlyChanges !== 'undefined') {
-                            const mes = parseInt(document.getElementById('currentMonth').value);
-                            const year = parseInt(document.getElementById('currentYear').value);
-                            const monthKey = `${year}-${String(mes).padStart(2, '0')}`;
-                            
-                            if (!monthlyChanges[monthKey]) {
-                                monthlyChanges[monthKey] = [];
-                            }
-                            
-                            monthlyChanges[monthKey].push({
-                                tipo: 'BAJA',
-                                codigo: panelSeleccionadoBaja.codigo,
-                                municipio: panelSeleccionadoBaja.municipio,
-                                motivo: motivo,
-                                timestamp: new Date().toISOString()
-                            });
-                            
-                            localStorage.setItem(CHANGES_KEY, JSON.stringify(monthlyChanges));
-                        }
-
-                        showToast(`✅ Panel dado de baja exitosamente\n\nCódigo: ${panelSeleccionadoBaja.codigo}\nMotivo: ${motivo}`, 'success');
-                    }
-
-                    // Actualizar interfaz
-                    updateTable();
-                    await actualizarDashboard();
-                    if (typeof saveData === 'function') saveData();
-                    
-                    closeModal('modalBaja');
-                } else {
-                    throw new Error('Error en la aplicación del cambio');
-                }
-                
-            } catch (error) {
-                console.error('❌ Error:', error);
-                showToast(`❌ Error al dar de baja:\n\n${error.message}`, 'error');
-            }
-        }
-
-        // ====================
         // MODAL: DESMONTAJE TEMPORAL
         // ====================
 
@@ -8355,7 +8115,6 @@
                                 'ALTA': '📈 ALTA',
                                 'REINSTALACION': '🔄 REINSTALACIÓN',
                                 'DESMONTAJE_TEMPORAL': '📦 DESMONTAJE',
-                                'BAJA_DEFINITIVA': '📉 BAJA',
                                 'CAMBIO_TARIFA': '💰 CAMBIO TARIFA'
                             }[action] || action;
                             return `<span style="background: #E5E7EB; padding: 4px 10px; border-radius: 12px; font-size: 12px; margin-right: 8px;">${label} (${count})</span>`;
@@ -8398,7 +8157,6 @@
                             'ALTA': '📈 ALTA',
                             'REINSTALACION': '🔄 REINSTALACIÓN',
                             'DESMONTAJE_TEMPORAL': '📦 DESMONTAJE',
-                            'BAJA_DEFINITIVA': '📉 BAJA',
                             'CAMBIO_TARIFA': '💰 CAMBIO TARIFA'
                         }[evento.action] || evento.action;
                         
@@ -8546,7 +8304,6 @@
                     ALTA: 'ALTA',
                     REINSTALACION: 'REINSTALACIÓN',
                     DESMONTAJE_TEMPORAL: 'DESMONTAJE TEMPORAL',
-                    BAJA_DEFINITIVA: 'BAJA DEFINITIVA',
                     CAMBIO_TARIFA: 'CAMBIO TARIFA'
                 };
                 const accion = actionTextMap[evento.action] || evento.action;
