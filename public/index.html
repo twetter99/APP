@@ -2964,19 +2964,30 @@
                     <!-- Campos de Edición en Grid 2 Columnas -->
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                         <div class="form-group" style="margin: 0;">
-                            <label for="editAgregadoDias" style="font-weight: 500; color: #222; margin-bottom: 6px; display: block;">Días Facturables</label>
+                            <label for="editAgregadoFechaInicio" style="font-weight: 500; color: #222; margin-bottom: 6px; display: block;">📅 Fecha Inicio Evento</label>
+                            <input type="date" 
+                                   id="editAgregadoFechaInicio" 
+                                   onchange="recalcularImporteAgregado()"
+                                   style="width: 100%; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 14px; font-weight: 500; background: #fafbfc;">
+                            <small style="display: block; margin-top: 4px; color: #888; font-size: 11px;">Día del evento (hasta fin de mes)</small>
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label for="editAgregadoDias" style="font-weight: 500; color: #222; margin-bottom: 6px; display: block;">⏱️ Días Facturables</label>
                             <input type="number" 
                                    id="editAgregadoDias" 
                                    min="0" 
-                                   max="30" 
+                                   max="31" 
                                    step="1" 
-                                   placeholder="0-30" 
-                                   onchange="recalcularImporteAgregado()"
-                                   style="width: 100%; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 15px; font-weight: 500; text-align: center; background: #fafbfc;">
-                            <small style="display: block; margin-top: 4px; color: #888; font-size: 11px;">0-30 días del mes</small>
+                                   readonly
+                                   style="width: 100%; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 15px; font-weight: 600; text-align: center; background: #f0f9ff; color: #0369a1;">
+                            <small style="display: block; margin-top: 4px; color: #888; font-size: 11px;">Desde inicio hasta fin de mes</small>
                         </div>
+                    </div>
+                    
+                    <!-- Fila para Tarifa -->
+                    <div style="margin-bottom: 20px;">
                         <div class="form-group" style="margin: 0;">
-                            <label for="editAgregadoTarifa" style="font-weight: 500; color: #222; margin-bottom: 6px; display: block;">Tarifa Base (€/mes)</label>
+                            <label for="editAgregadoTarifa" style="font-weight: 500; color: #222; margin-bottom: 6px; display: block;">💰 Tarifa Base (€/mes)</label>
                             <input type="number" 
                                    id="editAgregadoTarifa" 
                                    step="0.01" 
@@ -8540,9 +8551,91 @@
                 document.getElementById('editAgregadoTarifa').value = 37.70; // Tarifa base por defecto
                 document.getElementById('editAgregadoImporte').value = (data.totalImporte || 0).toFixed(2);
                 
-                // Mostrar información de contexto (incluyendo municipio)
+                // Obtener eventos asociados (acciones) desde el documento de billing PRIMERO
+                const acciones = data.acciones || {};
+                
+                // Determinar el tipo de evento principal (el primero o el más relevante)
+                const tipoEventoPrincipal = Object.keys(acciones).length > 0 ? Object.keys(acciones)[0] : null;
+                
+                // Inicializar fecha de inicio basada en los días actuales y tipo de evento
+                const [year, month] = monthKey.split('-');
+                const diasActuales = data.totalDiasFacturables || 0;
+                const primerDia = new Date(parseInt(year), parseInt(month) - 1, 1);
+                const ultimoDia = new Date(parseInt(year), parseInt(month), 0);
+                const totalDiasDelMes = ultimoDia.getDate();
+                
+                if (diasActuales > 0) {
+                    let fechaEventoCalculada;
+                    
+                    // Determinar fecha del evento según el tipo
+                    const eventosDeInicio = ['ALTA', 'REINSTALACION'];
+                    const eventosDeFin = ['DESMONTAJE_TEMPORAL', 'BAJA_DEFINITIVA'];
+                    
+                    if (eventosDeInicio.includes(tipoEventoPrincipal)) {
+                        // Evento de INICIO: Si tiene X días, empezó en el día (totalDías - X + 1)
+                        const diaEvento = totalDiasDelMes - diasActuales + 1;
+                        fechaEventoCalculada = new Date(parseInt(year), parseInt(month) - 1, diaEvento);
+                        
+                    } else if (eventosDeFin.includes(tipoEventoPrincipal)) {
+                        // Evento de FIN: Si tiene X días, terminó en el día X (desde inicio)
+                        fechaEventoCalculada = new Date(parseInt(year), parseInt(month) - 1, diasActuales);
+                        
+                    } else {
+                        // Sin tipo específico: usar comportamiento por defecto (evento de inicio)
+                        const diaEvento = totalDiasDelMes - diasActuales + 1;
+                        fechaEventoCalculada = new Date(parseInt(year), parseInt(month) - 1, diaEvento);
+                    }
+                    
+                    document.getElementById('editAgregadoFechaInicio').value = fechaEventoCalculada.toISOString().split('T')[0];
+                } else {
+                    // Sin días, dejar vacío
+                    document.getElementById('editAgregadoFechaInicio').value = '';
+                }
+                
+                // Establecer min/max para el selector de fecha (solo dentro del mes)
+                document.getElementById('editAgregadoFechaInicio').min = primerDia.toISOString().split('T')[0];
+                document.getElementById('editAgregadoFechaInicio').max = ultimoDia.toISOString().split('T')[0];
+                
+                // Generar HTML de eventos
+                let eventosHtml = '';
+                
+                // Guardar tipo de evento en campo oculto para usarlo en cálculos
+                if (!document.getElementById('editAgregadoTipoEvento')) {
+                    const inputTipo = document.createElement('input');
+                    inputTipo.type = 'hidden';
+                    inputTipo.id = 'editAgregadoTipoEvento';
+                    document.getElementById('modalEditarAgregado').querySelector('.modal-body').appendChild(inputTipo);
+                }
+                document.getElementById('editAgregadoTipoEvento').value = tipoEventoPrincipal || '';
+                
+                if (Object.keys(acciones).length > 0) {
+                    const accionesLabels = {
+                        'ALTA': '📈 ALTA',
+                        'REINSTALACION': '🔄 REINSTALACIÓN',
+                        'DESMONTAJE_TEMPORAL': '📦 DESMONTAJE',
+                        'CAMBIO_TARIFA': '💰 CAMBIO TARIFA',
+                        'BAJA_DEFINITIVA': '📉 BAJA'
+                    };
+                    
+                    eventosHtml = Object.entries(acciones)
+                        .map(([accion, count]) => {
+                            const label = accionesLabels[accion] || accion;
+                            return `
+                                <div style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                     padding: 6px 14px; border-radius: 16px; margin-right: 8px; margin-bottom: 8px;">
+                                    <span style="color: white; font-size: 12px; font-weight: 600;">${label}</span>
+                                    ${count > 1 ? `<span style="color: rgba(255,255,255,0.8); font-size: 11px; margin-left: 4px;">×${count}</span>` : ''}
+                                </div>
+                            `;
+                        })
+                        .join('');
+                } else {
+                    eventosHtml = '<div style="color: #9CA3AF; font-size: 12px; font-style: italic;">Sin eventos registrados</div>';
+                }
+                
+                // Mostrar información de contexto (incluyendo municipio y eventos)
                 document.getElementById('editAgregadoInfo').innerHTML = `
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
                         <div style="background: white; padding: 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                             <div style="font-size: 11px; color: #6B7280; font-weight: 500; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Panel</div>
                             <div style="font-size: 20px; font-weight: 700; color: #1F2937;">${panelId}</div>
@@ -8558,6 +8651,16 @@
                         <div style="background: white; padding: 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                             <div style="font-size: 11px; color: #6B7280; font-weight: 500; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Documento</div>
                             <div style="font-size: 11px; font-weight: 500; color: #6B7280; font-family: 'Courier New', monospace;">${billingDocId}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sección de Eventos -->
+                    <div style="background: white; padding: 14px 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 4px solid #667eea;">
+                        <div style="font-size: 11px; color: #6B7280; font-weight: 500; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+                            📋 Eventos asociados a esta facturación
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; align-items: center;">
+                            ${eventosHtml}
                         </div>
                     </div>
                 `;
@@ -8576,19 +8679,104 @@
         }
 
         /**
-         * Recalcular importe basado en días y tarifa
+         * Recalcular importe basado en fecha de inicio, tipo de evento y tarifa
          */
         function recalcularImporteAgregado() {
-            const dias = parseInt(document.getElementById('editAgregadoDias').value) || 0;
+            const fechaInicioStr = document.getElementById('editAgregadoFechaInicio').value;
+            const monthKey = document.getElementById('editAgregadoMonthKey').value;
             const tarifa = parseFloat(document.getElementById('editAgregadoTarifa').value) || 37.70;
+            const tipoEvento = document.getElementById('editAgregadoTipoEvento')?.value || '';
             
+            let dias = 0;
+            let fechaInicioCalculada = '';
+            let fechaFinCalculada = '';
+            let explicacion = '';
+            
+            // Si hay fecha de evento, calcular días según el tipo
+            if (fechaInicioStr && monthKey) {
+                const [year, month] = monthKey.split('-');
+                const fechaEvento = new Date(fechaInicioStr + 'T00:00:00');
+                const primerDiaDelMes = new Date(parseInt(year), parseInt(month) - 1, 1);
+                const ultimoDiaDelMes = new Date(parseInt(year), parseInt(month), 0);
+                const diaDelEvento = fechaEvento.getDate();
+                
+                // Determinar el tipo de cálculo según el evento
+                const eventosDeInicio = ['ALTA', 'REINSTALACION'];
+                const eventosDeFin = ['DESMONTAJE_TEMPORAL', 'BAJA_DEFINITIVA'];
+                
+                if (eventosDeInicio.includes(tipoEvento)) {
+                    // EVENTOS DE INICIO: Factura desde día del evento hasta fin de mes
+                    fechaInicioCalculada = fechaEvento.toISOString().split('T')[0];
+                    fechaFinCalculada = ultimoDiaDelMes.toISOString().split('T')[0];
+                    
+                    const diffTime = ultimoDiaDelMes - fechaEvento;
+                    dias = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                    
+                    explicacion = `Panel activo desde día ${diaDelEvento} hasta fin de mes`;
+                    
+                } else if (eventosDeFin.includes(tipoEvento)) {
+                    // EVENTOS DE FIN: Factura desde inicio de mes hasta día del evento
+                    fechaInicioCalculada = primerDiaDelMes.toISOString().split('T')[0];
+                    fechaFinCalculada = fechaEvento.toISOString().split('T')[0];
+                    
+                    dias = diaDelEvento; // Del día 1 al día del evento (inclusivo)
+                    
+                    explicacion = `Panel activo desde inicio de mes hasta día ${diaDelEvento}`;
+                    
+                } else if (tipoEvento === 'CAMBIO_TARIFA') {
+                    // CAMBIO DE TARIFA: Mes completo con nueva tarifa
+                    fechaInicioCalculada = primerDiaDelMes.toISOString().split('T')[0];
+                    fechaFinCalculada = ultimoDiaDelMes.toISOString().split('T')[0];
+                    
+                    dias = ultimoDiaDelMes.getDate(); // Todos los días del mes
+                    
+                    explicacion = `Mes completo con nueva tarifa`;
+                    
+                } else {
+                    // SIN TIPO ESPECÍFICO: Comportamiento por defecto (desde evento hasta fin)
+                    fechaInicioCalculada = fechaEvento.toISOString().split('T')[0];
+                    fechaFinCalculada = ultimoDiaDelMes.toISOString().split('T')[0];
+                    
+                    const diffTime = ultimoDiaDelMes - fechaEvento;
+                    dias = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                    
+                    explicacion = `Desde día ${diaDelEvento} hasta fin de mes (sin tipo de evento)`;
+                }
+            }
+            
+            // Actualizar campo de días (readonly)
+            document.getElementById('editAgregadoDias').value = dias;
+            
+            // Calcular importe
             const importe = (dias * tarifa) / 30;
             document.getElementById('editAgregadoImporte').value = importe.toFixed(2);
             
             // Actualizar preview
             const calculoEl = document.getElementById('editAgregadoCalculo');
             if (calculoEl) {
-                calculoEl.textContent = `${dias} días × ${tarifa.toFixed(2)}€ ÷ 30 = ${importe.toFixed(2)}€`;
+                if (dias > 0) {
+                    const tipoEventoLabel = {
+                        'ALTA': '📈 ALTA',
+                        'REINSTALACION': '🔄 REINSTALACIÓN',
+                        'DESMONTAJE_TEMPORAL': '📦 DESMONTAJE',
+                        'BAJA_DEFINITIVA': '📉 BAJA',
+                        'CAMBIO_TARIFA': '💰 CAMBIO TARIFA'
+                    }[tipoEvento] || 'Sin evento';
+                    
+                    calculoEl.innerHTML = `
+                        <div style="margin-bottom: 8px; padding: 6px 10px; background: #F3F4F6; border-radius: 6px; display: inline-block;">
+                            <strong>${tipoEventoLabel}</strong> → ${explicacion}
+                        </div>
+                        <div style="margin-top: 8px;">
+                            📅 ${fechaInicioCalculada} → ${fechaFinCalculada}
+                        </div>
+                        <div style="margin-top: 4px; font-size: 14px;">
+                            ${dias} días × ${tarifa.toFixed(2)}€ ÷ 30 = <strong style="color: #059669; font-size: 16px;">${importe.toFixed(2)}€</strong>
+                        </div>
+                    `;
+                } else {
+                    calculoEl.textContent = 'Selecciona la fecha del evento para calcular';
+                }
             }
         }
 
@@ -8629,19 +8817,26 @@
                 await firebaseDB.collection('panel_month_billing').doc(docId).update(updateData);
                 
                 console.log('✅ Documento actualizado en Firestore');
-                alert('✅ Facturación actualizada correctamente');
                 
-                // Cerrar modal y recargar desglose
+                // Cerrar modal
                 closeModal('modalEditarAgregado');
                 
+                // Recargar datos y actualizar interfaz
                 const mes = parseInt(document.getElementById('currentMonth').value);
                 const year = parseInt(document.getElementById('currentYear').value);
                 const monthKey = `${year}-${String(mes).padStart(2, '0')}`;
+                
+                console.log('🔄 Recargando tabla y desglose...');
+                await updateTable();
                 await mostrarDesgloseEventos(monthKey);
+                await actualizarEstadisticas();
+                
+                console.log('✅ Interfaz actualizada correctamente');
+                showToast('✅ Facturación actualizada correctamente', 'success');
                 
             } catch (error) {
                 console.error('❌ Error guardando datos:', error);
-                alert(`Error al guardar:\n\n${error.message}`);
+                showToast(`❌ Error al guardar: ${error.message}`, 'error');
             }
         }
 
